@@ -70,6 +70,18 @@ export const Header: React.FC<HeaderProps> = ({
             </TouchableOpacity>
           )}
 
+          <TouchableOpacity
+            style={styles.notifBtn}
+            onPress={() => {
+              triggerHaptic('light');
+              router.push('/notifications');
+            }}
+            activeOpacity={0.8}
+          >
+            <Bell size={17} color={COLORS.text} />
+            <View style={styles.notifDot} />
+          </TouchableOpacity>
+
           {showRoleToggle && (
             <TouchableOpacity
               style={[
@@ -171,5 +183,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  notifBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    position: 'relative',
+  },
+  notifDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: COLORS.secondary,
   },
 });

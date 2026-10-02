@@ -19,6 +19,9 @@ interface ListingsContextType {
   toggleListingStatus: (id: string) => void;
   unlockedContacts: Record<string, boolean>;
   unlockSellerContact: (listingId: string, buyerId: string, sellerId: string) => Promise<boolean>;
+  wishlist: string[];
+  toggleWishlist: (listingId: string) => void;
+  isWishlisted: (listingId: string) => boolean;
 }
 
 const ListingsContext = createContext<ListingsContextType | undefined>(undefined);
@@ -35,6 +38,19 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   
   // Masked contact unlock records
   const [unlockedContacts, setUnlockedContacts] = useState<Record<string, boolean>>({});
+  
+  // Wishlist state
+  const [wishlist, setWishlist] = useState<string[]>(['l1', 'l3']);
+
+  const toggleWishlist = (listingId: string) => {
+    setWishlist((prev) =>
+      prev.includes(listingId)
+        ? prev.filter((id) => id !== listingId)
+        : [...prev, listingId]
+    );
+  };
+
+  const isWishlisted = (listingId: string) => wishlist.includes(listingId);
 
   // Filter listings based on radius, category, search query and active status
   const filteredListings = listings.filter((item) => {
@@ -121,6 +137,9 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         toggleListingStatus,
         unlockedContacts,
         unlockSellerContact,
+        wishlist,
+        toggleWishlist,
+        isWishlisted,
       }}
     >
       {children}

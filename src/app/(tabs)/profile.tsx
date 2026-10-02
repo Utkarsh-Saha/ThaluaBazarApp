@@ -18,17 +18,23 @@ import {
   LogOut,
   ChevronRight,
   Sparkles,
+  Heart,
+  Bell,
+  Settings as SettingsIcon,
+  Crown,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { COLORS, SHADOWS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
+import { useListings } from '../../context/ListingsContext';
 import { triggerHaptic } from '../../lib/haptics';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { language, toggleLanguage, setLanguage, t } = useLanguage();
   const { user, role, switchRole, logout } = useAuth();
+  const { wishlist } = useListings();
 
   const handleToggleLanguage = () => {
     triggerHaptic('light');
@@ -62,6 +68,85 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* SECTION D: Common Features from Blueprint */}
+        <View style={styles.menuSection}>
+          <Text style={styles.sectionTitle}>
+            {language === 'as' ? 'প্ৰধান সেৱাসমূহ' : 'Account Quick Access'}
+          </Text>
+
+          {/* Wishlist */}
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              triggerHaptic('light');
+              router.push('/wishlist');
+            }}
+          >
+            <View style={[styles.menuIconBox, { backgroundColor: '#FEECEC' }]}>
+              <Heart size={18} color={COLORS.error} />
+            </View>
+            <View style={styles.menuTextContainer}>
+              <Text style={styles.menuItemTitle}>
+                {language === 'as' ? 'প্ৰিয় তালিকা (Wishlist)' : 'Wishlist & Saved Items'}
+              </Text>
+              <Text style={styles.menuItemSub}>
+                {language === 'as'
+                  ? `${wishlist.length} টা সংৰক্ষিত সামগ্ৰী`
+                  : `${wishlist.length} saved local products`}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
+
+          {/* Addresses */}
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              triggerHaptic('light');
+              router.push('/addresses');
+            }}
+          >
+            <View style={[styles.menuIconBox, { backgroundColor: COLORS.primaryLight }]}>
+              <MapPin size={18} color={COLORS.primary} />
+            </View>
+            <View style={styles.menuTextContainer}>
+              <Text style={styles.menuItemTitle}>
+                {language === 'as' ? 'ঠিকনাসমূহ (Addresses)' : 'Delivery Addresses'}
+              </Text>
+              <Text style={styles.menuItemSub}>
+                {language === 'as'
+                  ? 'ডেলিভাৰী স্থান পৰিচালনা কৰক'
+                  : 'Manage home, work & farm drop points'}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
+
+          {/* Notifications */}
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              triggerHaptic('light');
+              router.push('/notifications');
+            }}
+          >
+            <View style={[styles.menuIconBox, { backgroundColor: COLORS.secondaryLight }]}>
+              <Bell size={18} color={COLORS.secondary} />
+            </View>
+            <View style={styles.menuTextContainer}>
+              <Text style={styles.menuItemTitle}>
+                {language === 'as' ? 'জাননীসমূহ (Notifications)' : 'Notifications & Alerts'}
+              </Text>
+              <Text style={styles.menuItemSub}>
+                {language === 'as'
+                  ? 'অৰ্ডাৰ, সাপ্তাহিক হাট আৰু মূল্যৰ খবৰ'
+                  : 'Order status, weekly haat alerts'}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
+        </View>
+
         {/* Switch Hub Actions */}
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>
@@ -87,6 +172,29 @@ export default function ProfileScreen() {
                 {language === 'as'
                   ? 'সামগ্ৰী যোগ কৰক, অৰ্ডাৰ পৰিচালনা কৰক'
                   : 'Manage products, incoming orders & payouts'}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              triggerHaptic('medium');
+              router.push('/seller/subscription');
+            }}
+          >
+            <View style={[styles.menuIconBox, { backgroundColor: '#FFF6E0' }]}>
+              <Crown size={18} color={COLORS.secondary} />
+            </View>
+            <View style={styles.menuTextContainer}>
+              <Text style={styles.menuItemTitle}>
+                {language === 'as' ? 'বিক্ৰেতা চাবস্ক্ৰিপশ্বন' : 'Seller Subscription (Basic Plan ₹20/mo)'}
+              </Text>
+              <Text style={styles.menuItemSub}>
+                {language === 'as'
+                  ? 'প্লেন নবীকৰণ আৰু সুবিধা বৃদ্ধি'
+                  : 'Renew monthly membership & unlock SHG perks'}
               </Text>
             </View>
             <ChevronRight size={18} color={COLORS.textMuted} />
@@ -147,44 +255,49 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Address & Settings */}
+        {/* Settings & Support */}
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>
-            {language === 'as' ? 'ঠিকনা আৰু সহায়' : 'Account & Support'}
+            {language === 'as' ? 'ছেটিংছ আৰু সহায়' : 'Settings & Support'}
           </Text>
-
-          <View style={styles.menuItemStatic}>
-            <View style={[styles.menuIconBox, { backgroundColor: COLORS.primaryLight }]}>
-              <MapPin size={18} color={COLORS.primary} />
-            </View>
-            <View style={styles.menuTextContainer}>
-              <Text style={styles.menuItemTitle}>
-                {language === 'as' ? 'ডিফল্ট ঠিকনা' : 'Default Delivery Location'}
-              </Text>
-              <Text style={styles.menuItemSub}>
-                {user?.address || 'Ward No 4, Hospital Road, Mangaldai - 784125'}
-              </Text>
-            </View>
-          </View>
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() =>
-              Alert.alert(
-                'Thaluwa Bazar Helpdesk',
-                'Contact helpline: +91 94350-BAZAR or email support@thaluwabazar.in'
-              )
-            }
+            onPress={() => {
+              triggerHaptic('light');
+              router.push('/settings');
+            }}
+          >
+            <View style={[styles.menuIconBox, { backgroundColor: COLORS.primaryLight }]}>
+              <SettingsIcon size={18} color={COLORS.primary} />
+            </View>
+            <View style={styles.menuTextContainer}>
+              <Text style={styles.menuItemTitle}>
+                {language === 'as' ? 'ছেটিংছ (Settings)' : 'App Settings & Preferences'}
+              </Text>
+              <Text style={styles.menuItemSub}>
+                {language === 'as' ? 'জাননী, অফলাইন কেশ্ব আৰু নীতি' : 'Notifications, low data mode & policies'}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              triggerHaptic('light');
+              router.push('/support');
+            }}
           >
             <View style={[styles.menuIconBox, { backgroundColor: COLORS.warningLight }]}>
               <HelpCircle size={18} color={COLORS.warning} />
             </View>
             <View style={styles.menuTextContainer}>
               <Text style={styles.menuItemTitle}>
-                {language === 'as' ? 'সহায়তা কেন্দ্ৰ' : '24x7 Local Producer Support'}
+                {language === 'as' ? 'সহায়তা কেন্দ্ৰ (Support)' : '24x7 Local Producer Support'}
               </Text>
               <Text style={styles.menuItemSub}>
-                {language === 'as' ? 'ফোন বা ইমেইলৰ জৰিয়তে যোগাযোগ' : 'Call or WhatsApp local support team'}
+                {language === 'as' ? 'WhatsApp, ফোন আৰু প্ৰশ্নোত্তৰ' : 'WhatsApp chat, helpline & FAQs'}
               </Text>
             </View>
             <ChevronRight size={18} color={COLORS.textMuted} />
