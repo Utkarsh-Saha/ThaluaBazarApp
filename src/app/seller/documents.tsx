@@ -18,10 +18,12 @@ import {
   ShieldCheck,
   CreditCard,
 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { COLORS, SHADOWS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { triggerHaptic } from '../../lib/haptics';
+import { uploadToSupabaseStorage } from '../../lib/storage';
 
 export default function SellerDocumentsScreen() {
   const router = useRouter();
@@ -29,20 +31,46 @@ export default function SellerDocumentsScreen() {
   const { language, t } = useLanguage();
   const { uploadSellerDocuments } = useAuth();
 
-  const [idUploaded, setIdUploaded] = useState(true);
-  const [addressUploaded, setAddressUploaded] = useState(true);
-  const [shgCertUploaded, setShgCertUploaded] = useState(true);
-  const [bankUploaded, setBankUploaded] = useState(true);
+  const [idUrl, setIdUrl] = useState<string>('mock-id.jpg');
+  const [addressUrl, setAddressUrl] = useState<string>('mock-addr.jpg');
+  const [shgCertUrl, setShgCertUrl] = useState<string>('mock-shg.jpg');
+  const [bankUrl, setBankUrl] = useState<string>('mock-bank.jpg');
+  
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handlePickDocument = async (docKey: 'id' | 'address' | 'shg' | 'bank') => {
+    triggerHaptic('light');
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]?.uri) {
+        setUploadingDoc(docKey);
+        const uploaded = await uploadToSupabaseStorage('seller-documents', result.assets[0].uri, docKey);
+        if (docKey === 'id') setIdUrl(uploaded);
+        if (docKey === 'address') setAddressUrl(uploaded);
+        if (docKey === 'shg') setShgCertUrl(uploaded);
+        if (docKey === 'bank') setBankUrl(uploaded);
+        setUploadingDoc(null);
+      }
+    } catch (e) {
+      console.warn('Doc pick error:', e);
+      setUploadingDoc(null);
+    }
+  };
 
   const handleSubmit = async () => {
     triggerHaptic('success');
     setIsSubmitting(true);
     await uploadSellerDocuments({
-      id_proof_url: 'mock-id-proof.pdf',
-      address_proof_url: 'mock-address.pdf',
-      shg_cert_url: 'mock-shg-cert.pdf',
-      bank_proof_url: 'mock-passbook.pdf',
+      id_proof_url: idUrl,
+      address_proof_url: addressUrl,
+      shg_cert_url: shgCertUrl,
+      bank_proof_url: bankUrl,
     });
     setIsSubmitting(false);
     router.replace('/seller/verification');
@@ -104,13 +132,13 @@ export default function SellerDocumentsScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.uploadBtn, idUploaded && styles.uploadedBtn]}
-            onPress={() => {
-              triggerHaptic('light');
-              setIdUploaded(!idUploaded);
-            }}
+            style={[styles.uploadBtn, !!idUrl && styles.uploadedBtn]}
+            onPress={() => handlePickDocument('id')}
+            disabled={uploadingDoc === 'id'}
           >
-            {idUploaded ? (
+            {uploadingDoc === 'id' ? (
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            ) : idUrl ? (
               <Text style={styles.uploadedText}>{t('uploaded')}</Text>
             ) : (
               <>
@@ -134,13 +162,13 @@ export default function SellerDocumentsScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.uploadBtn, addressUploaded && styles.uploadedBtn]}
-            onPress={() => {
-              triggerHaptic('light');
-              setAddressUploaded(!addressUploaded);
-            }}
+            style={[styles.uploadBtn, !!addressUrl && styles.uploadedBtn]}
+            onPress={() => handlePickDocument('address')}
+            disabled={uploadingDoc === 'address'}
           >
-            {addressUploaded ? (
+            {uploadingDoc === 'address' ? (
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            ) : addressUrl ? (
               <Text style={styles.uploadedText}>{t('uploaded')}</Text>
             ) : (
               <>
@@ -164,13 +192,13 @@ export default function SellerDocumentsScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.uploadBtn, shgCertUploaded && styles.uploadedBtn]}
-            onPress={() => {
-              triggerHaptic('light');
-              setShgCertUploaded(!shgCertUploaded);
-            }}
+            style={[styles.uploadBtn, !!shgCertUrl && styles.uploadedBtn]}
+            onPress={() => handlePickDocument('shg')}
+            disabled={uploadingDoc === 'shg'}
           >
-            {shgCertUploaded ? (
+            {uploadingDoc === 'shg' ? (
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            ) : shgCertUrl ? (
               <Text style={styles.uploadedText}>{t('uploaded')}</Text>
             ) : (
               <>
@@ -194,13 +222,13 @@ export default function SellerDocumentsScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.uploadBtn, bankUploaded && styles.uploadedBtn]}
-            onPress={() => {
-              triggerHaptic('light');
-              setBankUploaded(!bankUploaded);
-            }}
+            style={[styles.uploadBtn, !!bankUrl && styles.uploadedBtn]}
+            onPress={() => handlePickDocument('bank')}
+            disabled={uploadingDoc === 'bank'}
           >
-            {bankUploaded ? (
+            {uploadingDoc === 'bank' ? (
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            ) : bankUrl ? (
               <Text style={styles.uploadedText}>{t('uploaded')}</Text>
             ) : (
               <>

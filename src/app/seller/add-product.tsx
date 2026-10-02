@@ -10,15 +10,18 @@ import {
   Switch,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Camera, Image as ImageIcon, Sparkles, Check } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { COLORS, SHADOWS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { useListings } from '../../context/ListingsContext';
 import { triggerHaptic } from '../../lib/haptics';
+import { uploadToSupabaseStorage } from '../../lib/storage';
 
 export default function AddProductScreen() {
   const router = useRouter();
@@ -31,7 +34,7 @@ export default function AddProductScreen() {
   const [titleAs, setTitleAs] = useState('সতেজ অসমীয়া কাজি নেমু');
   const [descEn, setDescEn] = useState('Freshly plucked organic Assam lemon with intense aroma and juice.');
   const [descAs, setDescAs] = useState('বাৰীৰ সতেজ সুগন্ধি কাজি নেমু। অধিক ৰস আৰু ৰোগ প্ৰতিৰোধক ক্ষমতাযুক্ত।');
-  const [categoryId, setCategoryId] = useState('6'); // Organic vegetables
+  const [categoryId, setCategoryId] = useState('c1');
   const [price, setPrice] = useState('60');
   const [unit, setUnit] = useState('kg');
   const [stock, setStock] = useState('25');
@@ -39,14 +42,46 @@ export default function AddProductScreen() {
   const [imageUrl, setImageUrl] = useState(
     'https://images.unsplash.com/photo-1590502593747-42a996133562?auto=format&fit=crop&w=600&q=80'
   );
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  const pickImage = async (useCamera: boolean) => {
+    triggerHaptic('light');
+    try {
+      const result = useCamera
+        ? await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.8,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.8,
+          });
+
+      if (!result.canceled && result.assets[0]?.uri) {
+        setIsUploading(true);
+        const uploadedUrl = await uploadToSupabaseStorage('product-images', result.assets[0].uri, 'products');
+        setImageUrl(uploadedUrl);
+        setIsUploading(false);
+      }
+    } catch (e) {
+      console.warn('Image pick error:', e);
+      setIsUploading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
     if (!titleEn || !price) return;
     triggerHaptic('success');
+    setIsSubmitting(true);
 
     const selectedCat = categories.find((c) => c.id === categoryId);
 
-    addNewListing({
+    await addNewListing({
       seller_id: sellerProfile?.id || 's1',
       seller_name: sellerProfile?.business_name || 'Pragjyotishpur Mahila SHG',
       seller_phone: '+91 94350 12345',
@@ -71,6 +106,7 @@ export default function AddProductScreen() {
       is_organic: isOrganic,
     });
 
+    setIsSubmitting(false);
     router.replace('/seller/products');
   };
 
@@ -101,15 +137,17 @@ export default function AddProductScreen() {
         <Text style={styles.label}>Product Image (ম’বাইল ফটো)</Text>
         <View style={styles.imageUploadCard}>
           <Image source={{ uri: imageUrl }} style={styles.previewImage} resizeMode="cover" />
+          {isUploading && (
+            <View style={styles.uploadingOverlay}>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <Text style={styles.uploadingText}>Uploading to Supabase...</Text>
+            </View>
+          )}
           <View style={styles.imageActions}>
             <TouchableOpacity
               style={styles.imgBtn}
-              onPress={() => {
-                triggerHaptic('light');
-                setImageUrl(
-                  'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=600&q=80'
-                );
-              }}
+              onPress={() => pickImage(true)}
+              disabled={isUploading}
             >
               <Camera size={16} color={COLORS.primary} />
               <Text style={styles.imgBtnText}>Camera</Text>
@@ -117,12 +155,8 @@ export default function AddProductScreen() {
 
             <TouchableOpacity
               style={styles.imgBtn}
-              onPress={() => {
-                triggerHaptic('light');
-                setImageUrl(
-                  'https://images.unsplash.com/photo-1590736969955-71cc94801759?auto=format&fit=crop&w=600&q=80'
-                );
-              }}
+              onPress={() => pickImage(false)}
+              disabled={isUploading}
             >
               <ImageIcon size={16} color={COLORS.primary} />
               <Text style={styles.imgBtnText}>Gallery</Text>
@@ -249,11 +283,22 @@ export default function AddProductScreen() {
         />
 
         {/* Submit Button */}
-        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.88}>
-          <Check size={18} color="#FFFFFF" />
-          <Text style={styles.submitBtnText}>
-            {language === 'as' ? 'সামগ্ৰী তালিকাভুক্ত কৰক' : 'Publish to Hyperlocal Feed'}
-          </Text>
+        <TouchableOpacity
+          style={[styles.submitBtn, isSubmitting && { opacity: 0.7 }]}
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+          activeOpacity={0.88}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <>
+              <Check size={18} color="#FFFFFF" />
+              <Text style={styles.submitBtnText}>
+                {language === 'as' ? 'সামগ্ৰী তালিকাভুক্ত কৰক' : 'Publish to Hyperlocal Feed'}
+              </Text>
+            </>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -299,10 +344,27 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderWidth: 1,
     borderColor: COLORS.border,
+    position: 'relative',
   },
   previewImage: {
     width: '100%',
     height: 160,
+  },
+  uploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  uploadingText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
   },
   imageActions: {
     flexDirection: 'row',
