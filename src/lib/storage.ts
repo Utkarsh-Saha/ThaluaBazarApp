@@ -1,43 +1,42 @@
 import { supabase } from './supabase';
 
 /**
- * Uploads a local image (URI) to Supabase Storage bucket.
- * Supports image files from expo-image-picker / camera.
+ * Uploads an image or document from a local URI to Supabase Storage.
+ * Returns the public URL of the uploaded asset, or falls back gracefully to the original URI.
  */
 export async function uploadToSupabaseStorage(
-  bucketName: 'product-images' | 'seller-documents',
-  fileUri: string,
-  folder: string = 'uploads'
+  bucket: 'product-images' | 'seller-documents',
+  uri: string,
+  prefix: string = 'file'
 ): Promise<string> {
   try {
-    if (!fileUri || fileUri.startsWith('http://') || fileUri.startsWith('https://')) {
-      return fileUri;
-    }
+    const fileExt = uri.split('.').pop() || 'jpg';
+    const fileName = `${prefix}-${Date.now()}.${fileExt}`;
+    const filePath = `${fileName}`;
 
-    const filename = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-    
-    const response = await fetch(fileUri);
+    const response = await fetch(uri);
     const blob = await response.blob();
+    const arrayBuffer = await new Response(blob).arrayBuffer();
 
     const { data, error } = await supabase.storage
-      .from(bucketName)
-      .upload(filename, blob, {
-        contentType: 'image/jpeg',
+      .from(bucket)
+      .upload(filePath, arrayBuffer, {
+        contentType: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`,
         upsert: true,
       });
 
     if (error) {
-      console.warn(`Supabase storage upload error on ${bucketName}:`, error.message);
-      return fileUri;
+      console.warn(`[Storage] Upload error:`, error.message);
+      return uri; // Graceful fallback
     }
 
     const { data: publicUrlData } = supabase.storage
-      .from(bucketName)
+      .from(bucket)
       .getPublicUrl(data.path);
 
-    return publicUrlData.publicUrl;
-  } catch (err) {
-    console.warn('Storage upload error fallback:', err);
-    return fileUri;
+    return publicUrlData.publicUrl || uri;
+  } catch (err: any) {
+    console.warn(`[Storage] Failed to upload asset:`, err.message);
+    return uri; // Fallback to local URI
   }
 }

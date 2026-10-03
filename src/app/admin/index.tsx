@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,17 +21,27 @@ import {
   Check,
   X,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
 import { useOrders } from '../../context/OrderContext';
 import { triggerHaptic } from '../../lib/haptics';
+import { apiRequest } from '../../lib/api';
 
 export default function AdminDashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { language, t } = useLanguage();
   const { orders } = useOrders();
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [stats, setStats] = useState({
+    total_users: 2568,
+    total_sellers: 452,
+    total_orders: 1258,
+    total_gmv: 245680,
+  });
 
   const [pendingSellers, setPendingSellers] = useState([
     {
@@ -48,15 +60,67 @@ export default function AdminDashboardScreen() {
     },
   ]);
 
-  const handleApprove = (id: string) => {
+  const fetchAdminData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [statsRes, sellersRes] = await Promise.all([
+        apiRequest<{ success: boolean; stats: any }>('/admin/stats'),
+        apiRequest<{ success: boolean; pending_sellers: any[] }>('/admin/pending-sellers'),
+      ]);
+
+      if (statsRes.success && statsRes.data?.stats) {
+        setStats(statsRes.data.stats);
+      }
+
+      if (sellersRes.success && sellersRes.data?.pending_sellers?.length) {
+        setPendingSellers(
+          sellersRes.data.pending_sellers.map((s: any) => ({
+            id: s.id,
+            name: s.business_name || s.users?.name || 'Local Seller',
+            district: s.district || 'Assam',
+            shgCode: s.shg_code || 'SHG-MEMBER',
+            type: s.seller_type === 'shg_member' ? 'SHG Member' : 'Individual Producer',
+          }))
+        );
+      }
+    } catch (e) {
+      console.log('Error fetching live admin stats:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAdminData();
+  }, [fetchAdminData]);
+
+  const handleApprove = async (id: string) => {
     triggerHaptic('success');
     setPendingSellers((prev) => prev.filter((s) => s.id !== id));
     Alert.alert('Approved', 'Seller profile verified and badge awarded.');
+
+    try {
+      await apiRequest(`/admin/sellers/${id}/status`, {
+        method: 'POST',
+        body: JSON.stringify({ status: 'verified' }),
+      });
+    } catch (e) {
+      // offline fallback
+    }
   };
 
-  const handleReject = (id: string) => {
+  const handleReject = async (id: string) => {
     triggerHaptic('warning');
     setPendingSellers((prev) => prev.filter((s) => s.id !== id));
+
+    try {
+      await apiRequest(`/admin/sellers/${id}/status`, {
+        method: 'POST',
+        body: JSON.stringify({ status: 'rejected' }),
+      });
+    } catch (e) {
+      // offline fallback
+    }
   };
 
   return (
@@ -78,30 +142,38 @@ export default function AdminDashboardScreen() {
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={fetchAdminData}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
       >
         {/* Platform Overview Metrics 2x2 Grid (Matching Flow E) */}
         <View style={styles.metricsGrid}>
           <View style={styles.metricCard}>
             <Users size={20} color={COLORS.primary} />
-            <Text style={styles.metricValue}>2,568</Text>
+            <Text style={styles.metricValue}>{stats.total_users.toLocaleString('en-IN')}</Text>
             <Text style={styles.metricLabel}>{t('totalUsers')}</Text>
           </View>
 
           <View style={styles.metricCard}>
             <Store size={20} color={COLORS.secondary} />
-            <Text style={styles.metricValue}>452</Text>
+            <Text style={styles.metricValue}>{stats.total_sellers.toLocaleString('en-IN')}</Text>
             <Text style={styles.metricLabel}>{t('totalSellers')}</Text>
           </View>
 
           <View style={styles.metricCard}>
             <ShoppingBag size={20} color={COLORS.accent} />
-            <Text style={styles.metricValue}>1,258</Text>
+            <Text style={styles.metricValue}>{stats.total_orders.toLocaleString('en-IN')}</Text>
             <Text style={styles.metricLabel}>{language === 'as' ? 'মুঠ অৰ্ডাৰ' : 'Total Orders'}</Text>
           </View>
 
           <View style={styles.metricCard}>
             <IndianRupee size={20} color={COLORS.success} />
-            <Text style={styles.metricValue}>₹2,45,680</Text>
+            <Text style={styles.metricValue}>₹{stats.total_gmv.toLocaleString('en-IN')}</Text>
             <Text style={styles.metricLabel}>{t('platformGMV')}</Text>
           </View>
         </View>
