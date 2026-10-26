@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  BackHandler,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +24,7 @@ import {
   ShieldCheck,
   Power,
   Store,
+  Crown,
 } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
@@ -40,6 +42,15 @@ export default function SellerDashboardScreen() {
   const requestedOrdersCount = sellerOrders.filter((o) => o.status === 'REQUESTED').length;
   const isOnline = sellerProfile?.is_online ?? true;
 
+  useEffect(() => {
+    const onBackPress = () => {
+      // Main dashboard is root; prevent hardware back button from navigating back to auth
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, []);
+
   const handleToggleStatus = () => {
     triggerHaptic('medium');
     toggleSellerOnline();
@@ -52,10 +63,14 @@ export default function SellerDashboardScreen() {
         <View style={styles.headerLeft}>
           <Text style={styles.greetingTitle}>
             {language === 'as' ? 'নমস্কাৰ, ' : 'Hello, '}
-            {sellerProfile?.business_name || 'Pragjyotishpur SHG'} 🌾
+            {sellerProfile?.business_name || (language === 'as' ? 'উৎপাদক' : 'Producer')} 🌾
           </Text>
           <Text style={styles.sellerCode}>
-            SHG Code: {sellerProfile?.shg_code || 'AS-DRG-SHG-2023-889'}
+            {sellerProfile?.shg_code
+              ? `SHG Code: ${sellerProfile.shg_code}`
+              : sellerProfile?.village
+              ? `${sellerProfile.village}, ${sellerProfile.district}`
+              : (language === 'as' ? 'পঞ্জীভুক্ত বিক্ৰেতা' : 'Registered Producer')}
           </Text>
         </View>
 
@@ -133,8 +148,8 @@ export default function SellerDashboardScreen() {
           {/* Today's Sales */}
           <View style={styles.metricBox}>
             <Text style={styles.metricLabel}>{t('todaysSales')}</Text>
-            <Text style={styles.metricValue}>₹{sellerProfile?.today_sales || '2,450'}</Text>
-            <Text style={styles.metricSub}>+18% from yesterday</Text>
+            <Text style={styles.metricValue}>₹{sellerProfile?.today_sales ?? 0}</Text>
+            <Text style={styles.metricSub}>{language === 'as' ? 'আজিৰ উপাৰ্জন' : "Today's Revenue"}</Text>
           </View>
 
           {/* Incoming Orders */}
@@ -144,20 +159,62 @@ export default function SellerDashboardScreen() {
           >
             <Text style={styles.metricLabel}>{t('totalOrders')}</Text>
             <Text style={[styles.metricValue, requestedOrdersCount > 0 && { color: COLORS.secondary }]}>
-              {requestedOrdersCount > 0 ? `${requestedOrdersCount} New` : '12'}
+              {requestedOrdersCount > 0 ? `${requestedOrdersCount} New` : sellerOrders.length}
             </Text>
             <Text style={styles.metricSub}>
-              {requestedOrdersCount > 0 ? 'Tap to accept' : 'All dispatched'}
+              {requestedOrdersCount > 0 ? 'Tap to accept' : (language === 'as' ? 'সকলো অৰ্ডাৰ প্ৰেৰণ কৰা হৈছে' : 'All dispatched')}
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Seller Subscription / Membership Status Banner */}
+        <TouchableOpacity
+          style={styles.subscriptionBanner}
+          onPress={() => {
+            triggerHaptic('light');
+            router.push('/seller/subscription');
+          }}
+          activeOpacity={0.88}
+        >
+          <View style={styles.subBannerLeft}>
+            <View style={styles.subCrownCircle}>
+              <Crown size={20} color={COLORS.secondary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.subTitleRow}>
+                <Text style={styles.subBannerTitle}>
+                  {language === 'as' ? 'বিক্ৰেতা সদস্যপদ' : 'Producer Membership'}
+                </Text>
+                <View style={styles.subActiveBadge}>
+                  <Text style={styles.subActiveBadgeText}>Active • ₹20/mo</Text>
+                </View>
+              </View>
+              <Text style={styles.subBannerSubtitle}>
+                {language === 'as'
+                  ? 'বেছিক উৎপাদক প্লেন • বৈধতা: ১০ নৱেম্বৰ ২০২৬'
+                  : 'Basic Producer Plan • Valid till 10 Nov 2026'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.subManageBtn}>
+            <Text style={styles.subManageBtnText}>
+              {language === 'as' ? 'নবীকৰণ' : 'Manage'}
+            </Text>
+            <ArrowRight size={13} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
 
         {/* Main Action Shortcuts Grid (Matching UI Flow C) */}
         <Text style={styles.sectionHeading}>
           {language === 'as' ? 'ব্যৱসায়িক কেন্দ্ৰ' : 'Producer Operations'}
         </Text>
 
-        <View style={styles.grid}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.operationsScrollView}
+          contentContainerStyle={styles.operationsScrollContent}
+        >
           {/* 1. Add Product */}
           <TouchableOpacity
             style={styles.gridCard}
@@ -170,7 +227,7 @@ export default function SellerDashboardScreen() {
             <View style={[styles.gridIconBox, { backgroundColor: COLORS.primaryLight }]}>
               <PlusCircle size={24} color={COLORS.primary} />
             </View>
-            <Text style={styles.gridCardTitle}>{t('addProduct')}</Text>
+            <Text style={styles.gridCardTitle} numberOfLines={2}>{t('addProduct')}</Text>
           </TouchableOpacity>
 
           {/* 2. My Products */}
@@ -185,7 +242,7 @@ export default function SellerDashboardScreen() {
             <View style={[styles.gridIconBox, { backgroundColor: COLORS.secondaryLight }]}>
               <Package size={24} color={COLORS.secondary} />
             </View>
-            <Text style={styles.gridCardTitle}>{t('myProducts')}</Text>
+            <Text style={styles.gridCardTitle} numberOfLines={2}>{t('myProducts')}</Text>
           </TouchableOpacity>
 
           {/* 3. Orders */}
@@ -200,7 +257,7 @@ export default function SellerDashboardScreen() {
             <View style={[styles.gridIconBox, { backgroundColor: COLORS.accentLight }]}>
               <ShoppingBag size={24} color={COLORS.accent} />
             </View>
-            <Text style={styles.gridCardTitle}>{t('orders')}</Text>
+            <Text style={styles.gridCardTitle} numberOfLines={2}>{t('orders')}</Text>
           </TouchableOpacity>
 
           {/* 4. Earnings */}
@@ -215,7 +272,7 @@ export default function SellerDashboardScreen() {
             <View style={[styles.gridIconBox, { backgroundColor: COLORS.successLight }]}>
               <IndianRupee size={24} color={COLORS.success} />
             </View>
-            <Text style={styles.gridCardTitle}>{t('earnings')}</Text>
+            <Text style={styles.gridCardTitle} numberOfLines={2}>{t('earnings')}</Text>
           </TouchableOpacity>
 
           {/* 5. Analytics */}
@@ -230,10 +287,10 @@ export default function SellerDashboardScreen() {
             <View style={[styles.gridIconBox, { backgroundColor: '#F3E8FF' }]}>
               <TrendingUp size={24} color="#8B5CF6" />
             </View>
-            <Text style={styles.gridCardTitle}>{t('analytics')}</Text>
+            <Text style={styles.gridCardTitle} numberOfLines={2}>{t('analytics')}</Text>
           </TouchableOpacity>
 
-          {/* 6. Support */}
+          {/* 6. Support / KYC */}
           <TouchableOpacity
             style={styles.gridCard}
             onPress={() => {
@@ -245,9 +302,26 @@ export default function SellerDashboardScreen() {
             <View style={[styles.gridIconBox, { backgroundColor: COLORS.warningLight }]}>
               <ShieldCheck size={24} color={COLORS.warning} />
             </View>
-            <Text style={styles.gridCardTitle}>KYC & Docs</Text>
+            <Text style={styles.gridCardTitle} numberOfLines={2}>KYC & Docs</Text>
           </TouchableOpacity>
-        </View>
+
+          {/* 7. Seller Subscription */}
+          <TouchableOpacity
+            style={styles.gridCard}
+            onPress={() => {
+              triggerHaptic('light');
+              router.push('/seller/subscription');
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.gridIconBox, { backgroundColor: '#FFF6E0' }]}>
+              <Crown size={24} color={COLORS.secondary} />
+            </View>
+            <Text style={styles.gridCardTitle} numberOfLines={2}>
+              {language === 'as' ? 'চাবস্ক্ৰিপশ্বন' : 'Subscription'}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
 
         {/* Incoming Orders Alert Box */}
         {requestedOrdersCount > 0 && (
@@ -441,16 +515,21 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginTop: 6,
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  operationsScrollView: {
+    marginHorizontal: -16,
+  },
+  operationsScrollContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
     gap: 12,
   },
   gridCard: {
-    width: '31%',
+    width: 104,
+    minHeight: 112,
     backgroundColor: COLORS.surface,
     borderRadius: 16,
-    padding: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -459,17 +538,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   gridIconBox: {
-    width: 46,
-    height: 46,
+    width: 48,
+    height: 48,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   gridCardTitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: COLORS.text,
     textAlign: 'center',
+    lineHeight: 15,
   },
   incomingAlertCard: {
     backgroundColor: '#FEF3C7',
@@ -508,5 +588,74 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '800',
+  },
+  subscriptionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFDF5',
+    borderWidth: 1.5,
+    borderColor: 'rgba(198, 139, 23, 0.35)',
+    borderRadius: 16,
+    padding: 14,
+    ...SHADOWS.sm,
+  },
+  subBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  subCrownCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFF6E0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  subBannerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  subActiveBadge: {
+    backgroundColor: 'rgba(19, 117, 71, 0.1)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(19, 117, 71, 0.25)',
+  },
+  subActiveBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  subBannerSubtitle: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  subManageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.secondary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  subManageBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

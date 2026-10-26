@@ -5,6 +5,7 @@ import {
   toggleOnlineStatus,
   getSellerAnalytics,
   requestPayout,
+  getSellerPayouts,
 } from '../controllers/sellerController.js';
 import { optionalAuth } from '../middleware/authMiddleware.js';
 
@@ -15,5 +16,6 @@ router.get('/:id', getSellerProfile);
 router.patch('/:id/toggle-online', optionalAuth, toggleOnlineStatus);
 router.get('/:id/analytics', optionalAuth, getSellerAnalytics);
 router.post('/payout', optionalAuth, requestPayout);
+router.get('/:id/payouts', optionalAuth, getSellerPayouts);
 
 export default router;

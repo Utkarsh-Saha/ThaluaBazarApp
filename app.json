@@ -16,7 +16,8 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "package": "com.utkarshsaha008.thaluwabazar"
     },
     "web": {
       "bundler": "metro",
@@ -26,7 +27,20 @@
     "plugins": [
       "expo-router",
       "expo-status-bar",
-      "expo-font"
-    ]
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#137547"
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3870d907-3e07-44f9-b6fb-e87f9b172f82"
+      }
+    }
   }
 }

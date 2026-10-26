@@ -803,3 +803,170 @@ button, input, select, textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* ===================================================
+   ADMIN CONSOLE & AUDIT TRAIL LOGGING STYLES
+   =================================================== */
+
+.live-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulseGreen 1.8s infinite;
+}
+
+@keyframes pulseGreen {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 7px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.terminal-card {
+  background-color: #0b1120;
+  border: 1px solid #1e293b;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Roboto Mono', Menlo, monospace;
+}
+
+.terminal-header {
+  background-color: #0f172a;
+  border-bottom: 1px solid #1e293b;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.terminal-dots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.terminal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.terminal-dot.red { background-color: #ef4444; }
+.terminal-dot.yellow { background-color: #f59e0b; }
+.terminal-dot.green { background-color: #10b981; }
+
+.terminal-screen {
+  padding: 16px 20px;
+  max-height: 520px;
+  overflow-y: auto;
+  color: #e2e8f0;
+  font-size: 0.81rem;
+  line-height: 1.65;
+}
+
+.terminal-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+  cursor: pointer;
+}
+
+.terminal-row:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.terminal-row.expanded {
+  background-color: rgba(14, 165, 233, 0.08);
+  border-left: 2px solid #0ea5e9;
+}
+
+.terminal-time {
+  color: #64748b;
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.terminal-actor {
+  color: #38bdf8;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.terminal-action-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.action-badge-verify {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.action-badge-reject {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.action-badge-override {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.action-badge-payout {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.action-badge-config {
+  background-color: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.action-badge-general {
+  background-color: rgba(148, 163, 184, 0.15);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.terminal-entity {
+  color: #a78bfa;
+  white-space: nowrap;
+}
+
+.terminal-msg {
+  color: #cbd5e1;
+  flex: 1;
+}
+
+.json-drawer {
+  margin: 6px 0 10px 24px;
+  padding: 12px 16px;
+  background-color: #030712;
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  font-size: 0.74rem;
+  color: #93c5fd;
+  overflow-x: auto;
+}

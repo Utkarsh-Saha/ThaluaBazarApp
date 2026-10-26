@@ -26,6 +26,7 @@ import {
 } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { triggerHaptic } from '../lib/haptics';
 
 interface AddressItem {
@@ -41,39 +42,29 @@ interface AddressItem {
   isDefault: boolean;
 }
 
-const INITIAL_ADDRESSES: AddressItem[] = [
-  {
-    id: 'addr-1',
-    name: 'John Doe',
-    phone: '+91 98765 43210',
-    type: 'home',
-    street: 'Ward No 4, Hospital Road',
-    village: 'Mangaldai Town',
-    district: 'Darrang',
-    pincode: '784125',
-    landmark: 'Near Civil Hospital',
-    isDefault: true,
-  },
-  {
-    id: 'addr-2',
-    name: 'John Doe (Farm)',
-    phone: '+91 98765 43210',
-    type: 'farm',
-    street: 'Paddy Field Plot #12, Deomornoi Road',
-    village: 'Deomornoi Village',
-    district: 'Darrang',
-    pincode: '784145',
-    landmark: 'Behind Weekly Haat Ground',
-    isDefault: false,
-  },
-];
-
 export default function AddressesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { language } = useLanguage();
+  const { user } = useAuth();
 
-  const [addresses, setAddresses] = useState<AddressItem[]>(INITIAL_ADDRESSES);
+  const [addresses, setAddresses] = useState<AddressItem[]>(
+    user?.address
+      ? [
+          {
+            id: 'addr-user-primary',
+            name: user.name || 'My Delivery Address',
+            phone: user.phone || '',
+            type: 'home',
+            street: user.address,
+            village: user.village || '',
+            district: user.district || 'Darrang',
+            pincode: user.pincode || '',
+            isDefault: true,
+          },
+        ]
+      : []
+  );
   const [modalVisible, setModalVisible] = useState(false);
 
   // Form state

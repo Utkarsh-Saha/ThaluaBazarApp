@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,18 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, ShieldCheck, Smartphone, KeyRound, Globe } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  ShieldCheck,
+  KeyRound,
+  Globe,
+  ShoppingBag,
+  Store,
+} from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
@@ -22,37 +30,147 @@ export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { language, toggleLanguage, t } = useLanguage();
-  const { selectedEntryRole, setSelectedEntryRole, sendOtp, verifyOtp } = useAuth();
+  const {
+    selectedEntryRole,
+    setSelectedEntryRole,
+    sendOtp,
+    verifyOtp,
+    sellerProfile,
+    user,
+    isAuthenticated,
+    isLoading: isAuthLoading,
+  } = useAuth();
 
-  const [phone, setPhone] = useState('9876543210');
-  const [otp, setOtp] = useState('123456');
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
+  const [countdown, setCountdown] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const isSeller = selectedEntryRole === 'seller';
 
+  // Completely reset form state
+  const resetFormState = useCallback(() => {
+    setPhone('');
+    setOtp('');
+    setOtpSent(false);
+    setCountdown(0);
+    setIsLoading(false);
+    setIsVerifying(false);
+  }, []);
+
+  // Form State Isolation: Reset on focus when navigating between Login & Register
+  useFocusEffect(
+    useCallback(() => {
+      resetFormState();
+    }, [resetFormState])
+  );
+
+  // Session Protection: Prevent authenticated users from staying in login screen
+  useEffect(() => {
+    if (!isAuthLoading && isAuthenticated && user) {
+      const target = isSeller
+        ? sellerProfile
+          ? '/seller/dashboard'
+          : '/seller/register'
+        : '/(tabs)/explore';
+      router.replace(target as any);
+    }
+  }, [isAuthLoading, isAuthenticated, user, isSeller, sellerProfile, router]);
+
+  // Countdown timer for OTP resend
+  useEffect(() => {
+    let timer: any;
+    if (countdown > 0) {
+      timer = setInterval(() => {
+        setCountdown((c) => c - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [countdown]);
+
   const handleSendOtp = async () => {
-    if (phone.length < 10) return;
+    if (phone.length < 10) {
+      Alert.alert(
+        language === 'as' ? 'অবৈধ নম্বৰ' : 'Invalid Number',
+        language === 'as'
+          ? 'অনুগ্ৰহ কৰি সঠিক ১০ টা সংখ্যাৰ মোবাইল নম্বৰ দিয়ক।'
+          : 'Please enter a valid 10-digit mobile number.'
+      );
+      return;
+    }
+
     triggerHaptic('medium');
     setIsLoading(true);
-    await sendOtp(phone);
+
+    const formattedPhone = phone.startsWith('+') ? phone : `+91${phone.replace(/\D/g, '')}`;
+    const res = await sendOtp(formattedPhone);
     setIsLoading(false);
-    setOtpSent(true);
+
+    if (res.success) {
+      setOtpSent(true);
+      setCountdown(45);
+      triggerHaptic('success');
+    } else {
+      Alert.alert('Error', res.error || 'Failed to send OTP.');
+    }
   };
 
   const handleVerifyOtp = async () => {
-    if (otp.length < 4) return;
-    triggerHaptic('success');
-    setIsLoading(true);
-    const success = await verifyOtp(phone, otp);
-    setIsLoading(false);
-    if (success) {
-      if (isSeller) {
-        router.replace('/seller/dashboard');
-      } else {
-        router.replace('/(tabs)/explore');
-      }
+    if (otp.length < 4) {
+      Alert.alert('OTP Required', 'Please enter the 6-digit OTP.');
+      return;
     }
+
+    triggerHaptic('medium');
+    setIsVerifying(true);
+
+    const formattedPhone = phone.startsWith('+') ? phone : `+91${phone.replace(/\D/g, '')}`;
+    const res = await verifyOtp(formattedPhone, otp);
+    setIsVerifying(false);
+
+    if (res.success) {
+      triggerHaptic('success');
+      if (res.isNewUser) {
+        // Arrived via "Verify and Continue" flow after completing verification:
+        // Pass verified credentials to Complete Profile page
+        router.push({
+          pathname: '/(auth)/register',
+          params: {
+            phone: formattedPhone,
+            verified: 'true',
+          },
+        });
+      } else {
+        // Reset navigation stack so authenticated screen becomes the root of the stack
+        const target = isSeller
+          ? sellerProfile
+            ? '/seller/dashboard'
+            : '/seller/register'
+          : '/(tabs)/explore';
+        router.replace(target as any);
+      }
+    } else {
+      Alert.alert('Verification Failed', res.error || 'Invalid OTP code.');
+    }
+  };
+
+  // Standard registration link (do NOT auto-populate credentials)
+  const handleSwitchToRegister = () => {
+    triggerHaptic('light');
+    resetFormState();
+    if (isSeller) {
+      router.push('/seller/register');
+    } else {
+      router.push('/(auth)/register');
+    }
+  };
+
+  const handleBackToWelcome = () => {
+    triggerHaptic('light');
+    resetFormState();
+    router.replace('/');
   };
 
   return (
@@ -63,17 +181,15 @@ export default function LoginScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.container,
-          { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 20 },
+          { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24 },
         ]}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Top navigation */}
+        {/* Top Navigation Row */}
         <View style={styles.topRow}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => {
-              triggerHaptic('light');
-              router.back();
-            }}
+            onPress={handleBackToWelcome}
           >
             <ArrowLeft size={20} color={COLORS.text} />
           </TouchableOpacity>
@@ -92,15 +208,17 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Role Segmented Selector */}
+        {/* Role Toggle Selector */}
         <View style={styles.roleToggle}>
           <TouchableOpacity
             style={[styles.roleOption, !isSeller && styles.activeRoleOption]}
             onPress={() => {
               triggerHaptic('light');
+              resetFormState();
               setSelectedEntryRole('buyer');
             }}
           >
+            <ShoppingBag size={16} color={!isSeller ? COLORS.primary : COLORS.textSecondary} />
             <Text style={[styles.roleOptionText, !isSeller && styles.activeRoleText]}>
               {language === 'as' ? 'ক্ৰেতা (Buyer)' : 'Buyer'}
             </Text>
@@ -110,9 +228,11 @@ export default function LoginScreen() {
             style={[styles.roleOption, isSeller && styles.activeRoleOption]}
             onPress={() => {
               triggerHaptic('light');
+              resetFormState();
               setSelectedEntryRole('seller');
             }}
           >
+            <Store size={16} color={isSeller ? COLORS.secondary : COLORS.textSecondary} />
             <Text style={[styles.roleOptionText, isSeller && styles.activeRoleText]}>
               {language === 'as' ? 'বিক্ৰেতা / গোট (Seller)' : 'Seller / SHG'}
             </Text>
@@ -135,15 +255,14 @@ export default function LoginScreen() {
           </Text>
         </View>
 
-        {/* Form */}
+        {/* Form Card */}
         <View style={styles.formCard}>
-          {/* Phone Input */}
-          <Text style={styles.inputLabel}>{t('mobileNumber')}</Text>
+          {/* Mobile Number Input (Fully Editable) */}
+          <Text style={styles.inputLabel}>{t('mobileNumber')} *</Text>
           <View style={styles.inputWrapper}>
             <View style={styles.countryCode}>
-              <Text style={styles.countryCodeText}>+91</Text>
+              <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
             </View>
-            <Smartphone size={18} color={COLORS.textSecondary} style={{ marginRight: 8 }} />
             <TextInput
               style={styles.textInput}
               keyboardType="phone-pad"
@@ -151,73 +270,90 @@ export default function LoginScreen() {
               placeholder="98765 43210"
               placeholderTextColor={COLORS.textMuted}
               value={phone}
-              onChangeText={setPhone}
+              editable={true}
+              onChangeText={(text) => {
+                setPhone(text.replace(/\D/g, ''));
+                if (otpSent) {
+                  setOtpSent(false);
+                  setOtp('');
+                }
+              }}
             />
-            {!otpSent && (
-              <TouchableOpacity
-                style={[styles.sendOtpBtn, phone.length === 10 && styles.sendOtpBtnActive]}
-                onPress={handleSendOtp}
-                disabled={isLoading || phone.length < 10}
-              >
+            <TouchableOpacity
+              style={[
+                styles.sendOtpBtn,
+                phone.length === 10 && !isLoading && styles.sendOtpBtnActive,
+              ]}
+              onPress={handleSendOtp}
+              disabled={isLoading || phone.length < 10 || countdown > 0}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
                 <Text style={styles.sendOtpText}>
-                  {isLoading ? '...' : t('sendOtp')}
+                  {countdown > 0 ? `${countdown}s` : otpSent ? 'Resend' : t('sendOtp')}
                 </Text>
-              </TouchableOpacity>
-            )}
+              )}
+            </TouchableOpacity>
           </View>
 
-          {/* OTP Input */}
-          <Text style={[styles.inputLabel, { marginTop: 18 }]}>{t('otp')}</Text>
+          {/* OTP Input (Explicit Entry) */}
+          <Text style={[styles.inputLabel, { marginTop: 16 }]}>{t('otp')}</Text>
           <View style={styles.inputWrapper}>
             <KeyRound size={18} color={COLORS.textSecondary} style={{ marginRight: 8 }} />
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, { letterSpacing: 4, fontWeight: '800' }]}
               keyboardType="number-pad"
               maxLength={6}
               placeholder="123456"
               placeholderTextColor={COLORS.textMuted}
               value={otp}
+              editable={true}
               onChangeText={setOtp}
             />
           </View>
 
-          {/* Primary Action Button */}
+          {/* Verify & Login Button */}
           <TouchableOpacity
             style={[styles.primaryButton, isSeller ? styles.sellerBtn : styles.buyerBtn]}
             onPress={handleVerifyOtp}
-            disabled={isLoading}
+            disabled={isVerifying || otp.length < 4}
             activeOpacity={0.88}
           >
-            {isLoading ? (
+            {isVerifying ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.primaryButtonText}>{t('loginRegister')}</Text>
+              <Text style={styles.primaryButtonText}>
+                {language === 'as' ? 'প্ৰৱেশ কৰক / পঞ্জীয়ন' : 'Verify & Continue'}
+              </Text>
             )}
           </TouchableOpacity>
         </View>
 
-        {/* Alternate link */}
+        {/* Footer info & Navigation switch */}
         <View style={styles.footerRow}>
           {isSeller ? (
             <TouchableOpacity
-              onPress={() => router.push('/seller/register')}
+              onPress={handleSwitchToRegister}
               style={styles.switchPromptBtn}
             >
               <Text style={styles.switchPromptText}>{t('newSellerPrompt')}</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
-              onPress={() => router.push('/seller/register')}
+              onPress={handleSwitchToRegister}
               style={styles.switchPromptBtn}
             >
-              <Text style={styles.switchPromptText}>{t('newSellerPrompt')}</Text>
+              <Text style={styles.switchPromptText}>
+                {language === 'as' ? '✨ নতুন একাউণ্ট সৃষ্টি কৰক' : '✨ New to Thaluwa Bazar? Register Profile'}
+              </Text>
             </TouchableOpacity>
           )}
 
           <View style={styles.securityBadge}>
             <ShieldCheck size={14} color={COLORS.success} />
             <Text style={styles.securityText}>
-              {language === 'as' ? 'সুৰক্ষিত প্ৰমাণীকৰণ (Supabase Auth)' : 'Secured by Supabase Auth'}
+              {language === 'as' ? 'সুৰক্ষিত প্ৰমাণীকৰণ (Supabase & Node.js)' : 'Secured with Supabase & Node.js API'}
             </Text>
           </View>
         </View>
@@ -268,8 +404,11 @@ const styles = StyleSheet.create({
   },
   roleOption: {
     flex: 1,
-    paddingVertical: 10,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
     borderRadius: 10,
   },
   activeRoleOption: {
@@ -282,11 +421,11 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   activeRoleText: {
-    color: COLORS.primary,
+    color: COLORS.text,
     fontWeight: '800',
   },
   header: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   title: {
     fontSize: 24,
@@ -326,11 +465,11 @@ const styles = StyleSheet.create({
   countryCode: {
     borderRightWidth: 1,
     borderRightColor: COLORS.border,
-    paddingRight: 10,
-    marginRight: 10,
+    paddingRight: 8,
+    marginRight: 8,
   },
   countryCodeText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: COLORS.text,
   },
@@ -343,7 +482,7 @@ const styles = StyleSheet.create({
   sendOtpBtn: {
     backgroundColor: COLORS.border,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 8,
   },
   sendOtpBtnActive: {
@@ -359,7 +498,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 24,
+    marginTop: 20,
     ...SHADOWS.sm,
   },
   buyerBtn: {
@@ -375,11 +514,11 @@ const styles = StyleSheet.create({
   },
   footerRow: {
     alignItems: 'center',
-    marginTop: 28,
-    gap: 16,
+    marginTop: 22,
+    gap: 14,
   },
   switchPromptBtn: {
-    padding: 8,
+    padding: 6,
   },
   switchPromptText: {
     color: COLORS.primary,

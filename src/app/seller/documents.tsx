@@ -31,10 +31,10 @@ export default function SellerDocumentsScreen() {
   const { language, t } = useLanguage();
   const { uploadSellerDocuments } = useAuth();
 
-  const [idUrl, setIdUrl] = useState<string>('mock-id.jpg');
-  const [addressUrl, setAddressUrl] = useState<string>('mock-addr.jpg');
-  const [shgCertUrl, setShgCertUrl] = useState<string>('mock-shg.jpg');
-  const [bankUrl, setBankUrl] = useState<string>('mock-bank.jpg');
+  const [idUrl, setIdUrl] = useState<string>('');
+  const [addressUrl, setAddressUrl] = useState<string>('');
+  const [shgCertUrl, setShgCertUrl] = useState<string>('');
+  const [bankUrl, setBankUrl] = useState<string>('');
   
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);

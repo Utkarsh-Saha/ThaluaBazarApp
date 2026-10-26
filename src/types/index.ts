@@ -22,6 +22,7 @@ export interface User {
   address?: string;
   village?: string;
   district?: string;
+  pincode?: string;
   verified: boolean;
   created_at: string;
 }
@@ -82,7 +83,6 @@ export interface Listing {
   lng: number;
   village: string;
   district: string;
-  haat_name?: string;
   distance_km?: number;
   rating: number;
   status: 'active' | 'inactive' | 'sold_out';
@@ -130,29 +130,21 @@ export interface Order {
   estimated_delivery?: string;
 }
 
-export interface HaatMarket {
-  id: string;
-  name_en: string;
-  name_as: string;
-  district: string;
-  location: string;
-  market_day: string;
-  market_day_as: string;
-  timings: string;
-  specialty_en: string;
-  specialty_as: string;
-  active_sellers_count: number;
-  lat: number;
-  lng: number;
-  distance_km?: number;
-  image_url: string;
-}
-
 export interface ContactUnlock {
   id: string;
   buyer_id: string;
   seller_id: string;
   listing_id: string;
   payment_status: 'free_tier' | 'paid';
+  created_at: string;
+}
+
+export interface SellerPayout {
+  id: string;
+  seller_id: string;
+  amount: number;
+  upi_id: string;
+  status: 'pending' | 'processed' | 'failed';
+  reference_no?: string;
   created_at: string;
 }

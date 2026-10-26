@@ -19,18 +19,14 @@ Modern, production-ready desktop and web operations dashboard for **Thaluwa Baza
    - State-machine tracking (`REQUESTED` ➔ `ACCEPTED` ➔ `READY_FOR_PICKUP` ➔ `COMPLETED` ➔ `CANCELLED`).
    - Order manifest inspection and administrative state overrides with recorded audit logs.
 
-4. **Weekly Rural Haat Aggregation Hubs:**
-   - Manage market schedules (Mangaldai, Sipajhar, Kharupetia, Tangla).
-   - Assign local market coordinators and track active stall counts.
-
-5. **Financial Settlement & Payouts Engine:**
+4. **Financial Settlement & Payouts Engine:**
    - Weekly batch disbursals to rural SHG bank accounts with UTR reference generation.
    - Cash-on-Delivery (COD) reconciliation.
 
-6. **Bilingual Localization:**
+5. **Bilingual Localization:**
    - Instant toggle between **English** and **Assamese (অসমীয়া)**.
 
-7. **Zero-Setup Live & Demo Resilience:**
+6. **Zero-Setup Live & Demo Resilience:**
    - Automatically connects to `http://localhost:5000/api/v1`.
    - Seamless offline fallback with interactive local state simulation.
 

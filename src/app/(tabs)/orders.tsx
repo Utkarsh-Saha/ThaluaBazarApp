@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,20 +7,59 @@ import {
   TouchableOpacity,
   Image,
 } from 'react-native';
-import { ShoppingBag, ChevronRight, PackageCheck, Clock } from 'lucide-react-native';
+import { ShoppingBag, ChevronRight, PackageCheck, Clock, Star } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Header } from '../../components/Header';
 import { OrderTrackingStepper } from '../../components/OrderTrackingStepper';
+import { ReviewModal } from '../../components/ReviewModal';
 import { COLORS, SHADOWS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
 import { useOrders } from '../../context/OrderContext';
 import { Order } from '../../types';
 import { triggerHaptic } from '../../lib/haptics';
+import { supabase } from '../../lib/supabase';
 
 export default function OrdersScreen() {
   const { language, t } = useLanguage();
   const { buyerOrders } = useOrders();
   const [activeFilter, setActiveFilter] = useState<'all' | 'ongoing' | 'completed'>('all');
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(buyerOrders[0]?.id || null);
+  const [reviewModalOrder, setReviewModalOrder] = useState<Order | null>(null);
+  const [reviewedOrders, setReviewedOrders] = useState<Record<string, { rating: number }>>({});
+
+  useEffect(() => {
+    // Load cached reviews
+    AsyncStorage.getItem('@thaluwa_reviewed_orders').then((val) => {
+      if (val) {
+        try {
+          setReviewedOrders(JSON.parse(val));
+        } catch {
+          // Ignore
+        }
+      }
+    });
+
+    // Check remote reviews for completed orders
+    const completedIds = buyerOrders.filter((o) => o.status === 'COMPLETED').map((o) => o.id);
+    if (completedIds.length > 0) {
+      supabase
+        .from('reviews')
+        .select('order_id, rating')
+        .in('order_id', completedIds)
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            setReviewedOrders((prev) => {
+              const updated = { ...prev };
+              data.forEach((r: any) => {
+                if (r.order_id) updated[r.order_id] = { rating: r.rating || 5 };
+              });
+              AsyncStorage.setItem('@thaluwa_reviewed_orders', JSON.stringify(updated)).catch(() => {});
+              return updated;
+            });
+          }
+        });
+    }
+  }, [buyerOrders]);
 
   const filtered = buyerOrders.filter((ord) => {
     if (activeFilter === 'ongoing') return ord.status !== 'COMPLETED' && ord.status !== 'CANCELLED';
@@ -183,6 +222,34 @@ export default function OrdersScreen() {
                   </View>
                 </View>
               )}
+
+              {/* Review & Feedback Section for Completed Orders */}
+              {item.status === 'COMPLETED' && (
+                <View style={styles.reviewActionRow}>
+                  {reviewedOrders[item.id] ? (
+                    <View style={styles.reviewedBadge}>
+                      <Star size={13} color="#D97706" fill="#F59E0B" />
+                      <Text style={styles.reviewedText}>
+                        {language === 'as' ? 'ৰেটিং দিয়া হ’ল' : 'Reviewed'} ({reviewedOrders[item.id].rating}★)
+                      </Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.rateBtn}
+                      onPress={() => {
+                        triggerHaptic('light');
+                        setReviewModalOrder(item);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Star size={14} color="#D97706" fill="#F59E0B" />
+                      <Text style={styles.rateBtnText}>
+                        {language === 'as' ? 'ৰেটিং আৰু পৰ্যালোচনা দিয়ক' : 'Rate & Review Order'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
             </View>
           );
         }}
@@ -194,6 +261,19 @@ export default function OrdersScreen() {
             </Text>
           </View>
         }
+      />
+
+      {/* Review Modal */}
+      <ReviewModal
+        visible={!!reviewModalOrder}
+        order={reviewModalOrder}
+        onClose={() => setReviewModalOrder(null)}
+        onSuccess={(orderId, rating) => {
+          setReviewedOrders((prev) => ({
+            ...prev,
+            [orderId]: { rating },
+          }));
+        }}
       />
     </View>
   );
@@ -366,5 +446,46 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontWeight: '600',
     marginTop: 10,
+  },
+  reviewActionRow: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderLight,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  rateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  rateBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  reviewedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  reviewedText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#047857',
   },
 });

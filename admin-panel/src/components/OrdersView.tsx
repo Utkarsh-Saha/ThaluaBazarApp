@@ -148,7 +148,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                       </td>
                       <td>
                         <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>
-                          {ord.pickup_or_delivery === 'pickup' ? '🏬 Haat Pickup' : '🚚 Doorstep Delivery'}
+                          {ord.pickup_or_delivery === 'pickup' ? '🏬 Direct Pickup' : '🚚 Doorstep Delivery'}
                         </div>
                         <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
                           Method: <strong>{ord.payment_method}</strong> ({ord.payment_status})
@@ -324,7 +324,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                   onChange={(e) => setNewStatus(e.target.value as Order['status'])}
                 >
                   <option value="ACCEPTED">ACCEPTED (Force Accept by Moderator)</option>
-                  <option value="READY_FOR_PICKUP">READY_FOR_PICKUP (Item At Haat Hub)</option>
+                  <option value="READY_FOR_PICKUP">READY_FOR_PICKUP (Item Ready For Pickup)</option>
                   <option value="COMPLETED">COMPLETED (Delivery Confirmed)</option>
                   <option value="CANCELLED">CANCELLED (Cancelled with Refund)</option>
                 </select>
@@ -344,7 +344,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                     fontSize: '0.85rem',
                     outline: 'none',
                   }}
-                  placeholder="E.g., Customer verified receipt at Mangaldai weekly haat counter."
+                  placeholder="E.g., Customer verified receipt directly with seller."
                   value={overrideReason}
                   onChange={(e) => setOverrideReason(e.target.value)}
                 />

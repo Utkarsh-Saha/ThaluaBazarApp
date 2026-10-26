@@ -12,7 +12,6 @@ export async function getListings(req: Request, res: Response): Promise<void> {
       category_id,
       search,
       seller_id,
-      haat_name,
       status = 'active',
       limit = '50',
       offset = '0',
@@ -60,9 +59,6 @@ export async function getListings(req: Request, res: Response): Promise<void> {
     }
     if (seller_id) {
       query = query.eq('seller_id', seller_id);
-    }
-    if (haat_name) {
-      query = query.eq('haat_name', haat_name);
     }
     if (search) {
       query = query.or(`title_en.ilike.%${search}%,title_as.ilike.%${search}%,village.ilike.%${search}%,district.ilike.%${search}%`);
@@ -139,7 +135,6 @@ export async function createListing(req: AuthenticatedRequest, res: Response): P
         lng: Number(listingPayload.lng || 92.03),
         village: listingPayload.village || 'Mangaldai',
         district: listingPayload.district || 'Darrang',
-        haat_name: listingPayload.haat_name || null,
         rating: 5.0,
         status: 'active',
         is_organic: listingPayload.is_organic ?? true,

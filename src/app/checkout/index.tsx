@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,31 +38,47 @@ export default function CheckoutScreen() {
     useCart();
   const { placeOrder } = useOrders();
 
-  const [address, setAddress] = useState(
-    user?.address || 'Ward No 4, Hospital Road, Mangaldai - 784125'
-  );
+  const [address, setAddress] = useState(user?.address || '');
   const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'cod' | 'netbanking'>('upi');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handlePlaceOrder = async () => {
     if (cart.length === 0) return;
+
+    if (!user) {
+      Alert.alert(
+        language === 'as' ? 'লগইন প্ৰয়োজন' : 'Login Required',
+        language === 'as'
+          ? 'অৰ্ডাৰ সম্পূৰ্ণ কৰিবলৈ অনুগ্ৰহ কৰি লগইন বা পঞ্জীয়ন কৰক।'
+          : 'Please log in or register your account before checking out.',
+        [
+          { text: language === 'as' ? 'বাতিল' : 'Cancel', style: 'cancel' },
+          {
+            text: language === 'as' ? 'লগইন কৰক' : 'Login / Register',
+            onPress: () => router.push('/(auth)/login'),
+          },
+        ]
+      );
+      return;
+    }
+
+    if (deliveryType === 'delivery' && !address.trim()) {
+      Alert.alert(
+        language === 'as' ? 'ঠিকনা প্ৰয়োজন' : 'Delivery Address Required',
+        language === 'as'
+          ? 'অনুগ্ৰহ কৰি সামগ্ৰী লাভৰ বাবে বিতৰণ ঠিকনা প্ৰদান কৰক।'
+          : 'Please provide a valid delivery address to place your order.'
+      );
+      return;
+    }
+
     triggerHaptic('success');
     setIsSubmitting(true);
 
     try {
       const order = await placeOrder(
         cart,
-        user || {
-          id: 'u-guest',
-          name: 'Local Buyer',
-          phone: '+91 98765 43210',
-          role: 'buyer',
-          language: 'en',
-          lat: 26.435,
-          lng: 92.03,
-          verified: true,
-          created_at: new Date().toISOString(),
-        },
+        user,
         deliveryType,
         address,
         paymentMethod

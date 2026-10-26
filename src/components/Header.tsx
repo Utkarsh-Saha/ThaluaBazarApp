@@ -2,44 +2,29 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Globe, Bell, Store, ShoppingBag } from 'lucide-react-native';
+import { Globe, Bell } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useLanguage } from '../context/LanguageContext';
-import { useAuth } from '../context/AuthContext';
 import { triggerHaptic } from '../lib/haptics';
 
 interface HeaderProps {
   title?: string;
   subtitle?: string;
   showLanguageToggle?: boolean;
-  showRoleToggle?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   title,
   subtitle,
   showLanguageToggle = true,
-  showRoleToggle = true,
 }) => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { language, toggleLanguage } = useLanguage();
-  const { role, switchRole } = useAuth();
 
   const handleLanguageToggle = () => {
     triggerHaptic('light');
     toggleLanguage();
-  };
-
-  const handleRoleToggle = () => {
-    triggerHaptic('medium');
-    if (role === 'buyer') {
-      switchRole('seller');
-      router.push('/seller/dashboard');
-    } else {
-      switchRole('buyer');
-      router.push('/(tabs)/explore');
-    }
   };
 
   return (
@@ -47,12 +32,12 @@ export const Header: React.FC<HeaderProps> = ({
       <View style={styles.topRow}>
         <View style={styles.titleSection}>
           <Text style={styles.appName}>
-            {language === 'as' ? 'থলুৱা বজাৰ' : 'Thaluwa Bazar'}
+            {title || (language === 'as' ? 'থলুৱা বজাৰ' : 'Thaluwa Bazar')}
           </Text>
           {subtitle ? (
-            <Text style={styles.subtitle}>{subtitle}</Text>
+            <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
           ) : (
-            <Text style={styles.locationText}>📍 Mangaldai, Darrang (Assam)</Text>
+            <Text style={styles.locationText} numberOfLines={1}>📍 Mangaldai, Darrang (Assam)</Text>
           )}
         </View>
 
@@ -81,29 +66,6 @@ export const Header: React.FC<HeaderProps> = ({
             <Bell size={17} color={COLORS.text} />
             <View style={styles.notifDot} />
           </TouchableOpacity>
-
-          {showRoleToggle && (
-            <TouchableOpacity
-              style={[
-                styles.roleButton,
-                role === 'seller' ? styles.sellerRoleButton : styles.buyerRoleButton,
-              ]}
-              onPress={handleRoleToggle}
-              activeOpacity={0.8}
-            >
-              {role === 'buyer' ? (
-                <>
-                  <Store size={14} color="#FFFFFF" />
-                  <Text style={styles.roleButtonText}>Sell</Text>
-                </>
-              ) : (
-                <>
-                  <ShoppingBag size={14} color="#FFFFFF" />
-                  <Text style={styles.roleButtonText}>Shop</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
         </View>
       </View>
     </View>
@@ -126,6 +88,7 @@ const styles = StyleSheet.create({
   },
   titleSection: {
     flex: 1,
+    marginRight: 12,
   },
   appName: {
     fontSize: 20,
@@ -147,7 +110,7 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   langButton: {
     flexDirection: 'row',
@@ -165,29 +128,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primary,
   },
-  roleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 4,
-  },
-  buyerRoleButton: {
-    backgroundColor: COLORS.secondary,
-  },
-  sellerRoleButton: {
-    backgroundColor: COLORS.primary,
-  },
-  roleButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
   notifBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',

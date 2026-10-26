@@ -21,8 +21,19 @@ export async function registerSeller(req: AuthenticatedRequest, res: Response): 
       bank_proof_url,
     } = req.body;
 
-    if (!user_id || !business_name || !village || !district || !upi_id) {
-      res.status(400).json({ success: false, error: 'Missing required seller fields' });
+    let targetUserId = user_id;
+    if ((!targetUserId || targetUserId.startsWith('usr-') || targetUserId.startsWith('u-')) && req.body.phone) {
+      const formattedPhone = req.body.phone.startsWith('+') ? req.body.phone : `+91${req.body.phone.replace(/\D/g, '')}`;
+      const { data: u } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .eq('phone', formattedPhone)
+        .maybeSingle();
+      if (u) targetUserId = u.id;
+    }
+
+    if (!targetUserId || !business_name || !village || !district || !upi_id) {
+      res.status(400).json({ success: false, error: 'Missing required seller fields or valid user' });
       return;
     }
 
@@ -30,7 +41,7 @@ export async function registerSeller(req: AuthenticatedRequest, res: Response): 
     const { data: existingProfile } = await supabaseAdmin
       .from('seller_profiles')
       .select('id')
-      .eq('user_id', user_id)
+      .eq('user_id', targetUserId)
       .maybeSingle();
 
     let profile;
@@ -63,7 +74,7 @@ export async function registerSeller(req: AuthenticatedRequest, res: Response): 
       const { data, error } = await supabaseAdmin
         .from('seller_profiles')
         .insert({
-          user_id,
+          user_id: targetUserId,
           business_name,
           seller_type,
           shg_code,
@@ -90,11 +101,11 @@ export async function registerSeller(req: AuthenticatedRequest, res: Response): 
     await supabaseAdmin
       .from('users')
       .update({ role: 'seller' })
-      .eq('id', user_id);
+      .eq('id', targetUserId);
 
     // 3. Create Notification for user
     await supabaseAdmin.from('notifications').insert({
-      user_id,
+      user_id: targetUserId,
       title_en: 'Seller Application Submitted!',
       title_as: 'বিক্ৰেতা আবেদন দাখিল কৰা হৈছে!',
       body_en: 'Your application is under review. You can now start adding draft listings.',
@@ -123,7 +134,7 @@ export async function getSellerProfile(req: Request, res: Response): Promise<voi
       return;
     }
 
-    res.json({ success: true, seller_profile: data });
+    res.json({ success: true, seller: data, seller_profile: data });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -151,7 +162,7 @@ export async function toggleOnlineStatus(req: AuthenticatedRequest, res: Respons
 
     if (error) throw error;
 
-    res.json({ success: true, is_online: newStatus, seller_profile: data });
+    res.json({ success: true, is_online: newStatus, seller: data, seller_profile: data });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -171,11 +182,11 @@ export async function getSellerAnalytics(req: AuthenticatedRequest, res: Respons
     // Fetch total orders and revenue
     const { data: orders } = await supabaseAdmin
       .from('orders')
-      .select('total, status, created_at')
+      .select('total, total_amount, status, created_at')
       .eq('seller_id', id);
 
     const completedOrders = (orders || []).filter((o) => o.status === 'COMPLETED');
-    const totalGmv = completedOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+    const totalGmv = completedOrders.reduce((sum, o) => sum + Number(o.total || o.total_amount || 0), 0);
     const pendingOrdersCount = (orders || []).filter((o) => o.status === 'REQUESTED' || o.status === 'ACCEPTED').length;
 
     // Fetch active listings count
@@ -188,15 +199,24 @@ export async function getSellerAnalytics(req: AuthenticatedRequest, res: Respons
     res.json({
       success: true,
       analytics: {
+        todaySales: profile?.today_sales || totalGmv,
         today_sales: profile?.today_sales || totalGmv,
+        totalRevenue: totalGmv,
         total_revenue: totalGmv,
+        totalOrders: orders?.length || 0,
         total_orders: orders?.length || 0,
+        completedOrders: completedOrders.length,
         completed_orders: completedOrders.length,
+        pendingOrders: pendingOrdersCount,
         pending_orders: pendingOrdersCount,
+        activeListings: activeListingsCount || 0,
         active_listings: activeListingsCount || 0,
         rating: profile?.rating || 5.0,
+        reviewsCount: profile?.reviews_count || 0,
         reviews_count: profile?.reviews_count || 0,
+        isOnline: profile?.is_online ?? true,
         is_online: profile?.is_online ?? true,
+        verificationStatus: profile?.verification_status || 'pending',
         verification_status: profile?.verification_status || 'pending',
       },
     });
@@ -228,6 +248,23 @@ export async function requestPayout(req: AuthenticatedRequest, res: Response): P
     if (error) throw error;
 
     res.status(201).json({ success: true, payout: data });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+export async function getSellerPayouts(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabaseAdmin
+      .from('seller_payouts')
+      .select('*')
+      .eq('seller_id', id)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json({ success: true, count: data?.length || 0, payouts: data || [] });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

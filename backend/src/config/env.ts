@@ -9,4 +9,5 @@ export const ENV = {
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || '',
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   EXPO_ACCESS_TOKEN: process.env.EXPO_ACCESS_TOKEN || '',
+  JWT_SECRET: process.env.JWT_SECRET || 'thaluwa-bazar-jwt-secret-2026',
 };

@@ -18,7 +18,6 @@ import {
   Shield,
   FileText,
   Trash2,
-  Info,
   ChevronRight,
   Sparkles,
 } from 'lucide-react-native';
@@ -32,7 +31,6 @@ export default function SettingsScreen() {
   const { language, setLanguage } = useLanguage();
 
   const [orderNotifs, setOrderNotifs] = useState(true);
-  const [haatAlerts, setHaatAlerts] = useState(true);
   const [lowDataMode, setLowDataMode] = useState(false);
   const [soundHaptics, setSoundHaptics] = useState(true);
 
@@ -151,27 +149,6 @@ export default function SettingsScreen() {
               onValueChange={(v) => {
                 triggerHaptic('light');
                 setOrderNotifs(v);
-              }}
-              trackColor={{ false: COLORS.border, true: COLORS.primary }}
-            />
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleTextContainer}>
-              <Text style={styles.toggleTitle}>
-                {language === 'as' ? 'সাপ্তাহিক হাট জাননী' : 'Weekly Haat Alerts'}
-              </Text>
-              <Text style={styles.toggleSubtitle}>
-                {language === 'as' ? 'নিকটৱৰ্তী সাপ্তাহিক বজাৰৰ খবৰ' : 'Reminders before local haat market days'}
-              </Text>
-            </View>
-            <Switch
-              value={haatAlerts}
-              onValueChange={(v) => {
-                triggerHaptic('light');
-                setHaatAlerts(v);
               }}
               trackColor={{ false: COLORS.border, true: COLORS.primary }}
             />

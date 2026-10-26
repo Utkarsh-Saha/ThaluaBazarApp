@@ -22,7 +22,6 @@ import {
   AdminStats,
   SellerProfile,
   Order,
-  HaatMarket,
   PayoutRecord,
   AuditLog,
 } from './services/api';
@@ -30,7 +29,6 @@ import { Language, translations } from './i18n';
 import { DashboardView } from './components/DashboardView';
 import { SellerKycView } from './components/SellerKycView';
 import { OrdersView } from './components/OrdersView';
-import { HaatMarketsView } from './components/HaatMarketsView';
 import { PayoutsView } from './components/PayoutsView';
 import { AuditLogsView } from './components/AuditLogsView';
 import { SettingsView } from './components/SettingsView';
@@ -58,7 +56,6 @@ export function App() {
 
   const [sellers, setSellers] = useState<SellerProfile[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [haats, setHaats] = useState<HaatMarket[]>([]);
   const [payouts, setPayouts] = useState<PayoutRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [selectedSeller, setSelectedSeller] = useState<SellerProfile | null>(null);
@@ -78,12 +75,11 @@ export function App() {
       const isOnline = await AdminApi.checkBackend();
       setBackendOnline(isOnline);
 
-      const [statsData, sellersData, ordersData, haatsData, payoutsData, auditData] =
+      const [statsData, sellersData, ordersData, payoutsData, auditData] =
         await Promise.all([
           AdminApi.getStats(),
           AdminApi.getSellers(),
           AdminApi.getOrders(),
-          AdminApi.getHaats(),
           AdminApi.getPayouts(),
           AdminApi.getAuditLogs(),
         ]);
@@ -91,7 +87,6 @@ export function App() {
       setStats(statsData);
       setSellers(sellersData);
       setOrders(ordersData);
-      setHaats(haatsData);
       setPayouts(payoutsData);
       setAuditLogs(auditData);
     } catch (err) {
@@ -141,12 +136,7 @@ export function App() {
     }
   };
 
-  // Handle Toggle Haat
-  const handleToggleHaat = async (haatId: string) => {
-    await AdminApi.toggleHaatStatus(haatId);
-    showToast('Haat Hub operational status toggled.');
-    loadData();
-  };
+
 
   // Handle Disburse Payout
   const handleDisbursePayout = async (payoutId: string) => {
@@ -240,15 +230,7 @@ export function App() {
             </div>
           </div>
 
-          <div
-            className={`nav-item ${currentTab === 'haats' ? 'active' : ''}`}
-            onClick={() => setCurrentTab('haats')}
-          >
-            <div className="nav-item-left">
-              <Store size={18} />
-              <span>{t.haatHubs}</span>
-            </div>
-          </div>
+
 
           <div className="nav-label" style={{ marginTop: 12 }}>
             Financial & Governance
@@ -313,7 +295,6 @@ export function App() {
               {currentTab === 'dashboard' && t.dashboard}
               {currentTab === 'kyc' && t.sellerKyc}
               {currentTab === 'orders' && t.orders}
-              {currentTab === 'haats' && t.haatHubs}
               {currentTab === 'payouts' && t.payouts}
               {currentTab === 'audit' && t.auditLogs}
               {currentTab === 'settings' && t.settings}
@@ -367,7 +348,6 @@ export function App() {
                 (s) => s.verification_status === 'pending' || s.verification_status === 'under_review'
               )}
               recentOrders={orders.slice(0, 5)}
-              haats={haats}
               lang={lang}
               onApproveSeller={handleApproveSeller}
               onRejectSeller={handleRejectSeller}
@@ -397,13 +377,7 @@ export function App() {
             />
           )}
 
-          {currentTab === 'haats' && (
-            <HaatMarketsView
-              haats={haats}
-              lang={lang}
-              onToggleHaat={handleToggleHaat}
-            />
-          )}
+
 
           {currentTab === 'payouts' && (
             <PayoutsView
@@ -417,6 +391,7 @@ export function App() {
             <AuditLogsView
               logs={auditLogs}
               lang={lang}
+              onRefresh={loadData}
             />
           )}
 
@@ -424,6 +399,7 @@ export function App() {
             <SettingsView
               lang={lang}
               backendOnline={backendOnline}
+              onConfigUpdated={loadData}
             />
           )}
         </div>

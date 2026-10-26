@@ -49,7 +49,7 @@ export default function ExploreScreen() {
             <View style={styles.greetingBanner}>
               <View>
                 <Text style={styles.greetingTitle}>
-                  {t('helloUser')} {user?.name || 'Assam Buyer'} 👋
+                  {user?.name ? `${t('helloUser')} ${user.name} 👋` : (language === 'as' ? 'থলুৱা বজাৰলৈ স্বাগতম 👋' : 'Welcome to Thaluwa Bazar 👋')}
                 </Text>
                 <Text style={styles.greetingSubtitle}>
                   {language === 'as'

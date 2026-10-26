@@ -15,14 +15,13 @@ import {
   ChevronRight,
   Package,
 } from 'lucide-react';
-import { AdminStats, SellerProfile, Order, HaatMarket } from '../services/api';
+import { AdminStats, SellerProfile, Order } from '../services/api';
 import { Language, translations } from '../i18n';
 
 interface DashboardViewProps {
   stats: AdminStats;
   pendingSellers: SellerProfile[];
   recentOrders: Order[];
-  haats: HaatMarket[];
   lang: Language;
   onApproveSeller: (id: string) => void;
   onRejectSeller: (id: string) => void;
@@ -34,7 +33,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   stats,
   pendingSellers,
   recentOrders,
-  haats,
   lang,
   onApproveSeller,
   onRejectSeller,
@@ -233,59 +231,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </table>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Weekly Haat Hub Status */}
-        <div className="panel-card">
-          <div className="panel-header">
-            <div className="panel-title">
-              <Store size={18} color="#d97706" />
-              <span>{t.haatHubs}</span>
-            </div>
-            <button
-              className="btn btn-outline btn-sm"
-              onClick={() => onNavigate('haats')}
-            >
-              <span>Manage</span>
-              <ChevronRight size={14} />
-            </button>
-          </div>
-
-          <div className="panel-body">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {haats.map((haat) => (
-                <div
-                  key={haat.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 12px',
-                    borderRadius: 10,
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>
-                      {lang === 'as' ? haat.name_as : haat.name_en}
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                      📍 {haat.district} • {haat.market_day}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <span className={`status-pill ${haat.is_active ? 'verified' : 'rejected'}`}>
-                      {haat.is_active ? 'Active Hub' : 'Inactive'}
-                    </span>
-                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>
-                      {haat.active_stalls_count} Stalls
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>

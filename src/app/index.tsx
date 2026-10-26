@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ShoppingBag, Store, Globe, ArrowRight, Sparkles } from 'lucide-react-native';
@@ -12,14 +12,31 @@ export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { language, toggleLanguage, t } = useLanguage();
-  const { setSelectedEntryRole, switchRole } = useAuth();
+  const { setSelectedEntryRole, switchRole, user, isAuthenticated, isLoading, role, sellerProfile } = useAuth();
 
-  const handleSelectRole = (role: 'buyer' | 'seller') => {
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user) {
+      const target = role === 'seller'
+        ? (sellerProfile ? '/seller/dashboard' : '/seller/register')
+        : '/(tabs)/explore';
+      router.replace(target as any);
+    }
+  }, [isLoading, isAuthenticated, user, role, sellerProfile, router]);
+
+  const handleSelectRole = (selectedRole: 'buyer' | 'seller') => {
     triggerHaptic('medium');
-    setSelectedEntryRole(role);
-    switchRole(role);
+    setSelectedEntryRole(selectedRole);
+    switchRole(selectedRole);
     router.push('/(auth)/login');
   };
+
+  if (isLoading || (isAuthenticated && user)) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 16 }]}>
@@ -103,16 +120,6 @@ export default function WelcomeScreen() {
           <View style={[styles.arrowButton, { backgroundColor: COLORS.secondary }]}>
             <ArrowRight size={18} color="#FFFFFF" />
           </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Footer login / quick entry */}
-      <View style={styles.footerSection}>
-        <TouchableOpacity
-          style={styles.directLoginButton}
-          onPress={() => handleSelectRole('buyer')}
-        >
-          <Text style={styles.directLoginText}>{t('haveAccount')}</Text>
         </TouchableOpacity>
       </View>
     </View>

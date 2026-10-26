@@ -12,7 +12,6 @@ import {
   User as UserIcon,
   Globe,
   Store,
-  Shield,
   MapPin,
   HelpCircle,
   LogOut,
@@ -21,7 +20,6 @@ import {
   Heart,
   Bell,
   Settings as SettingsIcon,
-  Crown,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { COLORS, SHADOWS } from '../../constants/theme';
@@ -53,20 +51,54 @@ export default function ProfileScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* User Card */}
-        <View style={styles.userCard}>
-          <View style={styles.avatarCircle}>
-            <UserIcon size={32} color={COLORS.primary} />
-          </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>{user?.name || 'Assam User'}</Text>
-            <Text style={styles.userPhone}>{user?.phone || '+91 98765 43210'}</Text>
-            <View style={styles.roleBadge}>
-              <Text style={styles.roleBadgeText}>
-                {role === 'seller' ? '🌱 Producer / SHG Member' : '🛍️ Verified Buyer'}
-              </Text>
+        {user ? (
+          <View style={styles.userCard}>
+            <View style={styles.avatarCircle}>
+              <UserIcon size={32} color={COLORS.primary} />
+            </View>
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>{user.name || (language === 'as' ? 'প্ৰফাইল' : 'User Profile')}</Text>
+              <Text style={styles.userPhone}>{user.phone}</Text>
+              <View style={styles.roleBadge}>
+                <Text style={styles.roleBadgeText}>
+                  {role === 'seller' ? '🌱 Producer / SHG Member' : '🛍️ Verified Buyer'}
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
+        ) : (
+          <View style={[styles.userCard, { backgroundColor: '#F0FDF4', borderColor: COLORS.primary }]}>
+            <View style={[styles.avatarCircle, { backgroundColor: COLORS.primaryLight }]}>
+              <UserIcon size={32} color={COLORS.primary} />
+            </View>
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>
+                {language === 'as' ? 'থলুৱা বজাৰলৈ স্বাগতম' : 'Welcome to Thaluwa Bazar'}
+              </Text>
+              <Text style={styles.userPhone}>
+                {language === 'as' ? 'লগইন বা পঞ্জীয়ন কৰক' : 'Log in to manage orders & produce'}
+              </Text>
+              <TouchableOpacity
+                style={{
+                  marginTop: 8,
+                  backgroundColor: COLORS.primary,
+                  paddingVertical: 6,
+                  paddingHorizontal: 16,
+                  borderRadius: 20,
+                  alignSelf: 'flex-start',
+                }}
+                onPress={() => {
+                  triggerHaptic('medium');
+                  router.push('/(auth)/login');
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>
+                  {language === 'as' ? 'লগ ইন কৰক' : 'Login / Register'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* SECTION D: Common Features from Blueprint */}
         <View style={styles.menuSection}>
@@ -139,8 +171,8 @@ export default function ProfileScreen() {
               </Text>
               <Text style={styles.menuItemSub}>
                 {language === 'as'
-                  ? 'অৰ্ডাৰ, সাপ্তাহিক হাট আৰু মূল্যৰ খবৰ'
-                  : 'Order status, weekly haat alerts'}
+                  ? 'অৰ্ডাৰ আৰু মূল্যৰ খবৰ'
+                  : 'Order status, delivery & price updates'}
               </Text>
             </View>
             <ChevronRight size={18} color={COLORS.textMuted} />
@@ -172,52 +204,6 @@ export default function ProfileScreen() {
                 {language === 'as'
                   ? 'সামগ্ৰী যোগ কৰক, অৰ্ডাৰ পৰিচালনা কৰক'
                   : 'Manage products, incoming orders & payouts'}
-              </Text>
-            </View>
-            <ChevronRight size={18} color={COLORS.textMuted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              triggerHaptic('medium');
-              router.push('/seller/subscription');
-            }}
-          >
-            <View style={[styles.menuIconBox, { backgroundColor: '#FFF6E0' }]}>
-              <Crown size={18} color={COLORS.secondary} />
-            </View>
-            <View style={styles.menuTextContainer}>
-              <Text style={styles.menuItemTitle}>
-                {language === 'as' ? 'বিক্ৰেতা চাবস্ক্ৰিপশ্বন' : 'Seller Subscription (Basic Plan ₹20/mo)'}
-              </Text>
-              <Text style={styles.menuItemSub}>
-                {language === 'as'
-                  ? 'প্লেন নবীকৰণ আৰু সুবিধা বৃদ্ধি'
-                  : 'Renew monthly membership & unlock SHG perks'}
-              </Text>
-            </View>
-            <ChevronRight size={18} color={COLORS.textMuted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              triggerHaptic('medium');
-              router.push('/admin');
-            }}
-          >
-            <View style={[styles.menuIconBox, { backgroundColor: COLORS.accentLight }]}>
-              <Shield size={18} color={COLORS.accent} />
-            </View>
-            <View style={styles.menuTextContainer}>
-              <Text style={styles.menuItemTitle}>
-                {language === 'as' ? 'এডমিন পেনেল (Admin Dashboard)' : 'Admin & Moderation Panel'}
-              </Text>
-              <Text style={styles.menuItemSub}>
-                {language === 'as'
-                  ? 'প্লেটফৰ্ম পৰিসংখ্যা আৰু অনুমোদন'
-                  : 'Platform analytics, commission & KYC approvals'}
               </Text>
             </View>
             <ChevronRight size={18} color={COLORS.textMuted} />
@@ -304,13 +290,15 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Logout */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
-          <LogOut size={18} color={COLORS.error} />
-          <Text style={styles.logoutText}>
-            {language === 'as' ? 'লগআউট কৰক' : 'Log Out'}
-          </Text>
-        </TouchableOpacity>
+        {/* Logout (only if authenticated) */}
+        {user && (
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+            <LogOut size={18} color={COLORS.error} />
+            <Text style={styles.logoutText}>
+              {language === 'as' ? 'লগআউট কৰক' : 'Log Out'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </View>
   );

@@ -1,18 +1,42 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, SellerProfile, UserRole, SellerType } from '../types';
 import { supabase } from '../lib/supabase';
+import { apiRequest, TOKEN_STORAGE_KEY } from '../lib/api';
+import { registerForPushNotificationsAsync } from '../lib/notifications';
+
+export interface BuyerRegistrationData {
+  phone: string;
+  name: string;
+  email?: string;
+  district: string;
+  village: string;
+  address: string;
+  pincode?: string;
+  lat?: number;
+  lng?: number;
+  language?: 'en' | 'as';
+}
+
+export interface VerifyOtpResult {
+  success: boolean;
+  isNewUser?: boolean;
+  error?: string;
+}
 
 interface AuthContextType {
   user: User | null;
   sellerProfile: SellerProfile | null;
   role: UserRole;
+  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   selectedEntryRole: 'buyer' | 'seller';
   setSelectedEntryRole: (role: 'buyer' | 'seller') => void;
-  sendOtp: (phone: string) => Promise<boolean>;
-  verifyOtp: (phone: string, otp: string) => Promise<boolean>;
+  sendOtp: (phone: string) => Promise<{ success: boolean; isExistingUser?: boolean; testOtp?: string; error?: string }>;
+  verifyOtp: (phone: string, otp: string) => Promise<VerifyOtpResult>;
+  registerBuyer: (data: BuyerRegistrationData) => Promise<{ success: boolean; error?: string }>;
+  updateBuyerProfile: (updates: Partial<User>) => Promise<boolean>;
   registerSeller: (data: {
     business_name: string;
     seller_type: SellerType;
@@ -38,258 +62,245 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const USER_STORAGE_KEY = '@thaluwa_user';
 const SELLER_STORAGE_KEY = '@thaluwa_seller';
 
-const DEFAULT_BUYER: User = {
-  id: 'buyer-01',
-  phone: '+91 98765 43210',
-  name: 'Pranab Das',
-  email: 'pranab.darrang@gmail.com',
-  role: 'buyer',
-  language: 'en',
-  lat: 26.4350,
-  lng: 92.0300,
-  address: 'Ward No 4, Hospital Road, Mangaldai - 784125',
-  village: 'Mangaldai Town',
-  district: 'Darrang',
-  verified: true,
-  created_at: new Date().toISOString(),
-};
-
-const DEFAULT_SELLER: SellerProfile = {
-  id: 'seller-01',
-  user_id: 'buyer-01',
-  business_name: 'Pragjyotishpur Mahila SHG',
-  seller_type: 'shg_member',
-  shg_code: 'AS-DRG-SHG-2023-889',
-  village: 'Deomornoi',
-  district: 'Darrang',
-  upi_id: 'pragjyotishpur@okaxis',
-  verification_status: 'verified',
-  rating: 4.8,
-  reviews_count: 38,
-  delivery_radius_km: 15,
-  is_online: true,
-  today_sales: 2450,
-  total_orders: 12,
-  created_at: new Date().toISOString(),
-};
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(DEFAULT_BUYER);
-  const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(DEFAULT_SELLER);
+  const [user, setUser] = useState<User | null>(null);
+  const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [role, setRole] = useState<UserRole>('buyer');
   const [selectedEntryRole, setSelectedEntryRole] = useState<'buyer' | 'seller'>('buyer');
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  useEffect(() => {
-    loadStoredSession();
-
-    // Listen to Supabase auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        await syncUserFromSupabase(session.user.id, session.user.phone || '');
-      } else if (event === 'SIGNED_OUT') {
-        // Keep local cache or clear based on preference
-      }
-    });
-
-    return () => {
-      authListener?.subscription.unsubscribe();
-    };
-  }, []);
-
-  const loadStoredSession = async () => {
+  // Load session from AsyncStorage
+  const loadStoredSession = useCallback(async () => {
     try {
-      const storedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
-      const storedSeller = await AsyncStorage.getItem(SELLER_STORAGE_KEY);
+      const [storedUser, storedSeller, storedToken] = await Promise.all([
+        AsyncStorage.getItem(USER_STORAGE_KEY),
+        AsyncStorage.getItem(SELLER_STORAGE_KEY),
+        AsyncStorage.getItem(TOKEN_STORAGE_KEY),
+      ]);
+
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
-        setUser(parsed);
-        setRole(parsed.role || 'buyer');
+        if (
+          parsed.name === 'Assam Local Buyer' ||
+          parsed.name === 'Local Producer' ||
+          parsed.name === 'Assam Buyer' ||
+          parsed.id?.startsWith('u-') ||
+          parsed.id === 'usr-buyer-01' ||
+          parsed.phone === '+91 98765 43210' ||
+          parsed.phone === '9876543210'
+        ) {
+          await AsyncStorage.multiRemove([USER_STORAGE_KEY, SELLER_STORAGE_KEY, TOKEN_STORAGE_KEY]);
+          setUser(null);
+          setSellerProfile(null);
+          setToken(null);
+        } else {
+          setUser(parsed);
+          setRole(parsed.role || 'buyer');
+        }
+      } else {
+        setUser(null);
       }
       if (storedSeller) {
         setSellerProfile(JSON.parse(storedSeller));
       }
+      if (storedToken) {
+        setToken(storedToken);
+      }
     } catch (e) {
-      console.warn('Session load error', e);
+      console.warn('[AuthContext] Session load error', e);
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const syncUserFromSupabase = async (authId: string, phone: string) => {
-    try {
-      // Query users table
-      const { data: dbUser, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('phone', phone)
-        .single();
+  useEffect(() => {
+    loadStoredSession();
+  }, [loadStoredSession]);
 
-      if (dbUser && !userError) {
-        const parsedUser: User = {
-          id: dbUser.id,
-          phone: dbUser.phone,
-          name: dbUser.name || 'Assam Resident',
-          email: dbUser.email,
-          role: (dbUser.role as UserRole) || 'buyer',
-          language: dbUser.language || 'en',
-          lat: dbUser.lat || 26.4350,
-          lng: dbUser.lng || 92.0300,
-          address: dbUser.address,
-          village: dbUser.village,
-          district: dbUser.district,
-          verified: dbUser.verified,
-          created_at: dbUser.created_at,
-        };
-
-        setUser(parsedUser);
-        setRole(parsedUser.role);
-        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(parsedUser));
-
-        // Query seller_profiles table
-        const { data: dbSeller } = await supabase
-          .from('seller_profiles')
-          .select('*')
-          .eq('user_id', dbUser.id)
-          .single();
-
-        if (dbSeller) {
-          const parsedSeller: SellerProfile = {
-            id: dbSeller.id,
-            user_id: dbSeller.user_id,
-            business_name: dbSeller.business_name,
-            seller_type: dbSeller.seller_type,
-            shg_code: dbSeller.shg_code,
-            village: dbSeller.village,
-            district: dbSeller.district,
-            upi_id: dbSeller.upi_id,
-            verification_status: dbSeller.verification_status,
-            rating: Number(dbSeller.rating || 5.0),
-            reviews_count: dbSeller.reviews_count || 0,
-            delivery_radius_km: dbSeller.delivery_radius_km || 15,
-            is_online: dbSeller.is_online,
-            today_sales: Number(dbSeller.today_sales || 0),
-            total_orders: dbSeller.total_orders || 0,
-            created_at: dbSeller.created_at,
-          };
-          setSellerProfile(parsedSeller);
-          await AsyncStorage.setItem(SELLER_STORAGE_KEY, JSON.stringify(parsedSeller));
-        }
-      }
-    } catch (err) {
-      console.warn('Sync user from Supabase error:', err);
+  useEffect(() => {
+    if (user?.id) {
+      registerForPushNotificationsAsync(user.id).catch((err) => {
+        console.warn('[AuthContext] Push notification registration skipped/failed:', err);
+      });
     }
-  };
+  }, [user?.id]);
 
-  const sendOtp = async (phone: string): Promise<boolean> => {
+  /**
+   * Send OTP via Backend
+   */
+  const sendOtp = async (phone: string): Promise<{ success: boolean; isExistingUser?: boolean; testOtp?: string; error?: string }> => {
     try {
-      // Format phone with country code if needed
-      const formattedPhone = phone.startsWith('+') ? phone : `+91${phone.replace(/\D/g, '')}`;
-      
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone,
+      const res = await apiRequest<{ success: boolean; isExistingUser: boolean; testOtp?: string; message?: string }>('/auth/send-otp', {
+        method: 'POST',
+        body: JSON.stringify({ phone }),
       });
 
-      if (error) {
-        console.log('Supabase OTP notice (fallback enabled):', error.message);
+      if (res.success && res.data) {
+        return {
+          success: true,
+          isExistingUser: res.data.isExistingUser,
+          testOtp: res.data.testOtp || '123456',
+        };
       }
-      return true;
-    } catch (e) {
-      console.warn('sendOtp fallback:', e);
-      return true;
+
+      if (res.error) {
+        return { success: false, error: res.error };
+      }
+
+      return { success: true, isExistingUser: false, testOtp: '123456' };
+    } catch (err: any) {
+      console.warn('[AuthContext] sendOtp error fallback:', err);
+      return { success: true, isExistingUser: false, testOtp: '123456' };
     }
   };
 
-  const verifyOtp = async (phone: string, otp: string): Promise<boolean> => {
+  /**
+   * Verify OTP via Backend
+   */
+  const verifyOtp = async (phone: string, otp: string): Promise<VerifyOtpResult> => {
     setIsLoading(true);
     try {
-      const formattedPhone = phone.startsWith('+') ? phone : `+91${phone.replace(/\D/g, '')}`;
+      const res = await apiRequest<{
+        success: boolean;
+        isNewUser: boolean;
+        user?: User;
+        sellerProfile?: SellerProfile;
+        token?: string;
+        error?: string;
+      }>('/auth/verify-otp', {
+        method: 'POST',
+        body: JSON.stringify({ phone, otp }),
+      });
 
-      // Try real Supabase OTP verification
-      try {
-        const { data: authData, error } = await supabase.auth.verifyOtp({
-          phone: formattedPhone,
-          token: otp,
-          type: 'sms',
-        });
+      if (res.success && res.data) {
+        const { isNewUser, user: dbUser, sellerProfile: dbSeller, token: sessionToken } = res.data;
 
-        if (!error && authData.user) {
-          await syncUserFromSupabase(authData.user.id, formattedPhone);
-          setIsLoading(false);
-          return true;
+        if (sessionToken) {
+          setToken(sessionToken);
+          await AsyncStorage.setItem(TOKEN_STORAGE_KEY, sessionToken);
         }
-      } catch (e) {
-        console.log('Supabase verifyOtp offline/mock mode:', e);
+
+        if (isNewUser) {
+          setIsLoading(false);
+          return { success: true, isNewUser: true };
+        }
+
+        if (dbUser) {
+          setUser(dbUser);
+          setRole(dbUser.role || 'buyer');
+          await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(dbUser));
+        }
+
+        if (dbSeller) {
+          setSellerProfile(dbSeller);
+          await AsyncStorage.setItem(SELLER_STORAGE_KEY, JSON.stringify(dbSeller));
+        }
+
+        setIsLoading(false);
+        return { success: true, isNewUser: false };
       }
 
-      // Hybrid Demo / Offline Flow
-      const newUser: User = {
-        id: `u-${Date.now()}`,
-        phone: formattedPhone,
-        name: selectedEntryRole === 'seller' ? 'Pragjyotishpur SHG Producer' : 'Pranab Das',
-        role: selectedEntryRole === 'seller' ? 'seller' : 'buyer',
-        language: 'en',
-        lat: 26.4350,
-        lng: 92.0300,
-        address: 'Ward No 4, Hospital Road, Mangaldai - 784125',
-        village: 'Mangaldai Town',
-        district: 'Darrang',
+      if (res.error) {
+        setIsLoading(false);
+        return { success: false, error: res.error };
+      }
+
+      // Offline fallback ONLY if OTP is 123456
+      if (otp.trim() === '123456') {
+        setIsLoading(false);
+        return { success: true, isNewUser: true };
+      }
+
+      setIsLoading(false);
+      return { success: false, error: 'Invalid verification code. Please enter 123456.' };
+    } catch (err: any) {
+      console.warn('[AuthContext] verifyOtp error fallback:', err);
+      setIsLoading(false);
+      return { success: false, error: err.message || 'Verification error' };
+    }
+  };
+
+  /**
+   * Register Buyer Profile
+   */
+  const registerBuyer = async (data: BuyerRegistrationData): Promise<{ success: boolean; error?: string }> => {
+    setIsLoading(true);
+    try {
+      const res = await apiRequest<{ success: boolean; user: User; token: string }>('/auth/register-buyer', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+
+      if (res.success && res.data?.user) {
+        const newUser = res.data.user;
+        setUser(newUser);
+        setRole('buyer');
+        if (res.data.token) {
+          setToken(res.data.token);
+          await AsyncStorage.setItem(TOKEN_STORAGE_KEY, res.data.token);
+        }
+        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser));
+        setIsLoading(false);
+        return { success: true };
+      }
+
+      // Local Fallback
+      const fallbackUser: User = {
+        id: `usr-${Date.now()}`,
+        phone: data.phone,
+        name: data.name,
+        email: data.email,
+        role: 'buyer',
+        language: data.language || 'en',
+        lat: data.lat || 26.4350,
+        lng: data.lng || 92.0300,
+        address: data.address,
+        village: data.village,
+        district: data.district,
         verified: true,
         created_at: new Date().toISOString(),
       };
 
-      setUser(newUser);
-      setRole(newUser.role);
-      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser));
-
-      if (selectedEntryRole === 'seller' && !sellerProfile) {
-        const newSeller: SellerProfile = {
-          id: `sel-${Date.now()}`,
-          user_id: newUser.id,
-          business_name: 'Pragjyotishpur Mahila SHG',
-          seller_type: 'shg_member',
-          village: 'Deomornoi',
-          district: 'Darrang',
-          upi_id: 'pragjyotishpur@okaxis',
-          verification_status: 'verified',
-          rating: 4.9,
-          reviews_count: 14,
-          delivery_radius_km: 15,
-          is_online: true,
-          today_sales: 0,
-          total_orders: 0,
-          created_at: new Date().toISOString(),
-        };
-        setSellerProfile(newSeller);
-        await AsyncStorage.setItem(SELLER_STORAGE_KEY, JSON.stringify(newSeller));
-
-        // Try inserting into Supabase seller_profiles
-        try {
-          await supabase.from('seller_profiles').insert([
-            {
-              business_name: newSeller.business_name,
-              seller_type: newSeller.seller_type,
-              village: newSeller.village,
-              district: newSeller.district,
-              upi_id: newSeller.upi_id,
-              verification_status: 'verified',
-              is_online: true,
-            },
-          ]);
-        } catch (e) {
-          // ignore offline
-        }
-      }
-
+      setUser(fallbackUser);
+      setRole('buyer');
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(fallbackUser));
       setIsLoading(false);
-      return true;
-    } catch (err) {
-      console.warn('verifyOtp error:', err);
+      return { success: true };
+    } catch (err: any) {
+      console.warn('[AuthContext] registerBuyer fallback:', err);
       setIsLoading(false);
-      return true;
+      return { success: false, error: err.message };
     }
   };
 
+  /**
+   * Update Profile
+   */
+  const updateBuyerProfile = async (updates: Partial<User>): Promise<boolean> => {
+    if (!user) return false;
+    const updated = { ...user, ...updates };
+    setUser(updated);
+    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updated));
+
+    try {
+      await apiRequest('/auth/sync', {
+        method: 'POST',
+        body: JSON.stringify({
+          phone: user.phone,
+          ...updates,
+        }),
+      });
+    } catch (e) {
+      console.log('[AuthContext] sync profile offline:', e);
+    }
+    return true;
+  };
+
+  /**
+   * Register Seller
+   */
   const registerSeller = async (data: {
     business_name: string;
     seller_type: SellerType;
@@ -300,6 +311,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }) => {
     if (!user) return;
 
+    try {
+      const res = await apiRequest<{ success: boolean; seller_profile: SellerProfile }>('/seller/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id: user.id,
+          phone: user.phone,
+          business_name: data.business_name,
+          seller_type: data.seller_type,
+          shg_code: data.shg_code,
+          village: data.village,
+          district: data.district,
+          upi_id: data.upi_id,
+        }),
+      });
+
+      if (res.success && res.data?.seller_profile) {
+        const profile = res.data.seller_profile;
+        setSellerProfile(profile);
+        setRole('seller');
+        const updatedUser: User = { ...user, role: 'seller' };
+        setUser(updatedUser);
+        await AsyncStorage.setItem(SELLER_STORAGE_KEY, JSON.stringify(profile));
+        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
+        return;
+      }
+    } catch (e) {
+      console.warn('[AuthContext] Backend registerSeller notice:', e);
+    }
+
+    // Local fallback if offline
     const newProfile: SellerProfile = {
       id: `sel-${Date.now()}`,
       user_id: user.id,
@@ -326,26 +367,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     await AsyncStorage.setItem(SELLER_STORAGE_KEY, JSON.stringify(newProfile));
     await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
-
-    // Sync to Supabase
-    try {
-      await supabase.from('seller_profiles').insert([
-        {
-          business_name: data.business_name,
-          seller_type: data.seller_type,
-          shg_code: data.shg_code,
-          village: data.village,
-          district: data.district,
-          upi_id: data.upi_id,
-          verification_status: 'pending',
-          is_online: true,
-        },
-      ]);
-    } catch (e) {
-      console.log('Supabase seller insert fallback:', e);
-    }
   };
 
+  /**
+   * Upload Seller Documents
+   */
   const uploadSellerDocuments = async (docs: {
     id_proof_url?: string;
     address_proof_url?: string;
@@ -364,7 +390,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSellerProfile(updated);
     await AsyncStorage.setItem(SELLER_STORAGE_KEY, JSON.stringify(updated));
 
-    // Update in Supabase
     try {
       await supabase
         .from('seller_profiles')
@@ -377,7 +402,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         })
         .eq('user_id', user?.id);
     } catch (e) {
-      console.log('Supabase doc update fallback:', e);
+      console.log('[AuthContext] Supabase doc update fallback:', e);
     }
   };
 
@@ -397,7 +422,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .update({ is_online: nextStatus })
         .eq('id', sellerProfile.id);
     } catch (e) {
-      console.log('Supabase toggle status fallback:', e);
+      console.log('[AuthContext] toggle status fallback:', e);
     }
   };
 
@@ -411,8 +436,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const refreshProfile = async () => {
-    if (user?.phone) {
-      await syncUserFromSupabase(user.id, user.phone);
+    if (user?.id) {
+      const res = await apiRequest<{ success: boolean; user: User }>(`/auth/profile/${user.id}`);
+      if (res.success && res.data?.user) {
+        setUser(res.data.user);
+        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(res.data.user));
+      }
     }
   };
 
@@ -424,8 +453,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     await AsyncStorage.removeItem(USER_STORAGE_KEY);
     await AsyncStorage.removeItem(SELLER_STORAGE_KEY);
+    await AsyncStorage.removeItem(TOKEN_STORAGE_KEY);
     setUser(null);
     setSellerProfile(null);
+    setToken(null);
     setRole('buyer');
   };
 
@@ -435,12 +466,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         sellerProfile,
         role,
+        token,
         isAuthenticated: !!user,
         isLoading,
         selectedEntryRole,
         setSelectedEntryRole,
         sendOtp,
         verifyOtp,
+        registerBuyer,
+        updateBuyerProfile,
         registerSeller,
         uploadSellerDocuments,
         toggleSellerOnline,

@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Order, OrderStatus, CartItem, DeliveryType, User } from '../types';
-import { INITIAL_ORDERS } from '../constants/mockData';
 import { triggerHaptic } from '../lib/haptics';
 import { supabase } from '../lib/supabase';
 
@@ -24,12 +23,79 @@ interface OrderContextType {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Group by buyer vs seller
   const buyerOrders = orders;
   const sellerOrders = orders;
+
+  const mapDbOrder = (row: any, items: any[] = []): Order => {
+    const rawItems = items.length > 0 ? items : (Array.isArray(row.items) ? row.items : []);
+    return {
+      id: row.id.toString(),
+      order_number: row.order_number,
+      buyer_id: row.buyer_id,
+      buyer_name: row.buyer_name,
+      buyer_phone: row.buyer_phone,
+      seller_id: row.seller_id,
+      seller_name: row.seller_name,
+      seller_phone: row.seller_phone,
+      items: rawItems.length > 0 ? rawItems.map((it: any) => ({
+        id: (it.id || `oi-${row.id}`).toString(),
+        order_id: (it.order_id || row.id).toString(),
+        listing_id: it.listing_id ? it.listing_id.toString() : '',
+        title: it.title || 'Produce Item',
+        quantity: Number(it.quantity || 1),
+        unit_price: Number(it.unit_price || 0),
+        unit: it.unit || 'kg',
+        line_total: Number(it.line_total || (Number(it.unit_price || 0) * Number(it.quantity || 1))),
+        image_url: it.image_url,
+      })) : [
+        {
+          id: `oi-${row.id}`,
+          order_id: row.id.toString(),
+          listing_id: 'l1',
+          title: 'Assam Produce Order',
+          quantity: 1,
+          unit_price: Number(row.subtotal),
+          unit: 'kg',
+          line_total: Number(row.subtotal),
+          image_url: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600',
+        },
+      ],
+      subtotal: Number(row.subtotal),
+      delivery_fee: Number(row.delivery_fee || 0),
+      discount: Number(row.discount || 0),
+      total: Number(row.total),
+      status: row.status as OrderStatus,
+      pickup_or_delivery: row.pickup_or_delivery as DeliveryType,
+      delivery_address: row.delivery_address,
+      payment_method: row.payment_method || 'cod',
+      payment_status: row.payment_status || 'pending',
+      created_at: row.created_at || new Date().toISOString(),
+      estimated_delivery: row.estimated_delivery || 'Within 2 hours',
+    };
+  };
+
+  const fetchLiveOrders = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        const mapped = data.map((row: any) => mapDbOrder(row, row.order_items || []));
+        setOrders(mapped);
+      }
+    } catch (e) {
+      console.log('Supabase orders fetch error, fallback:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchLiveOrders();
@@ -58,70 +124,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       supabase.removeChannel(channel);
     };
   }, []);
-
-  const mapDbOrder = (row: any, items: any[] = []): Order => ({
-    id: row.id.toString(),
-    order_number: row.order_number,
-    buyer_id: row.buyer_id,
-    buyer_name: row.buyer_name,
-    buyer_phone: row.buyer_phone,
-    seller_id: row.seller_id,
-    seller_name: row.seller_name,
-    seller_phone: row.seller_phone,
-    items: items.length > 0 ? items.map((it) => ({
-      id: it.id.toString(),
-      order_id: it.order_id.toString(),
-      listing_id: it.listing_id ? it.listing_id.toString() : '',
-      title: it.title,
-      quantity: it.quantity,
-      unit_price: Number(it.unit_price),
-      unit: it.unit,
-      line_total: Number(it.line_total),
-      image_url: it.image_url,
-    })) : [
-      {
-        id: `oi-${row.id}`,
-        order_id: row.id.toString(),
-        listing_id: 'l1',
-        title: 'Assam Produce Order',
-        quantity: 1,
-        unit_price: Number(row.subtotal),
-        unit: 'kg',
-        line_total: Number(row.subtotal),
-        image_url: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600',
-      },
-    ],
-    subtotal: Number(row.subtotal),
-    delivery_fee: Number(row.delivery_fee || 0),
-    discount: Number(row.discount || 0),
-    total: Number(row.total),
-    status: row.status as OrderStatus,
-    pickup_or_delivery: row.pickup_or_delivery as DeliveryType,
-    delivery_address: row.delivery_address,
-    payment_method: row.payment_method || 'cod',
-    payment_status: row.payment_status || 'pending',
-    created_at: row.created_at || new Date().toISOString(),
-    estimated_delivery: row.estimated_delivery || 'Within 2 hours',
-  });
-
-  const fetchLiveOrders = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*, order_items(*)')
-        .order('created_at', { ascending: false });
-
-      if (!error && data && data.length > 0) {
-        const mapped = data.map((row: any) => mapDbOrder(row, row.order_items || []));
-        setOrders(mapped);
-      }
-    } catch (e) {
-      console.log('Supabase orders fetch error, fallback:', e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const placeOrder = async (
     cart: CartItem[],

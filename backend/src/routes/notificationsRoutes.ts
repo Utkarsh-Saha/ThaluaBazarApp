@@ -10,6 +10,7 @@ import { optionalAuth } from '../middleware/authMiddleware.js';
 const router = Router();
 
 router.get('/user/:userId', getUserNotifications);
+router.get('/:userId', getUserNotifications);
 router.patch('/:id/read', optionalAuth, markNotificationAsRead);
 router.post('/mark-all-read', optionalAuth, markAllAsRead);
 router.post('/send-push', optionalAuth, sendManualPush);

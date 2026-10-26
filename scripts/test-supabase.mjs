@@ -29,7 +29,7 @@ if (!url || !key) {
 const supabase = createClient(url, key);
 
 async function runTests() {
-  const tables = ['categories', 'haat_markets', 'listings', 'users', 'orders'];
+  const tables = ['categories', 'listings', 'users', 'orders'];
   
   for (const table of tables) {
     try {

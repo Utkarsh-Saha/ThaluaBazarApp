@@ -103,39 +103,9 @@ alter table if exists public.categories add column if not exists name_as text;
 alter table if exists public.categories add column if not exists icon text;
 alter table if exists public.categories add column if not exists created_at timestamp with time zone default timezone('utc'::text, now());
 
--- 4. HAAT MARKETS TABLE
-create table if not exists public.haat_markets (
-  id text primary key,
-  name_en text not null,
-  name_as text not null,
-  district text not null,
-  location text not null,
-  market_day text not null,
-  market_day_as text not null,
-  timings text not null,
-  specialty_en text,
-  specialty_as text,
-  active_sellers_count integer default 0,
-  lat double precision not null,
-  lng double precision not null,
-  image_url text,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
-alter table if exists public.haat_markets add column if not exists name_en text;
-alter table if exists public.haat_markets add column if not exists name_as text;
-alter table if exists public.haat_markets add column if not exists district text;
-alter table if exists public.haat_markets add column if not exists location text;
-alter table if exists public.haat_markets add column if not exists market_day text;
-alter table if exists public.haat_markets add column if not exists market_day_as text;
-alter table if exists public.haat_markets add column if not exists timings text;
-alter table if exists public.haat_markets add column if not exists specialty_en text;
-alter table if exists public.haat_markets add column if not exists specialty_as text;
-alter table if exists public.haat_markets add column if not exists active_sellers_count integer default 0;
-alter table if exists public.haat_markets add column if not exists lat double precision;
-alter table if exists public.haat_markets add column if not exists lng double precision;
-alter table if exists public.haat_markets add column if not exists image_url text;
-alter table if exists public.haat_markets add column if not exists created_at timestamp with time zone default timezone('utc'::text, now());
+-- 4. CLEANUP HAAT MARKETS (FEATURE REMOVED)
+drop table if exists public.haat_markets cascade;
+alter table if exists public.listings drop column if exists haat_name;
 
 -- 5. LISTINGS TABLE
 create table if not exists public.listings (
@@ -159,7 +129,6 @@ create table if not exists public.listings (
   lng double precision not null,
   village text not null,
   district text not null,
-  haat_name text,
   rating numeric(3,2) default 4.8,
   status text default 'active' check (status in ('active', 'inactive', 'sold_out')),
   is_organic boolean default true,
@@ -186,7 +155,6 @@ alter table if exists public.listings add column if not exists lat double precis
 alter table if exists public.listings add column if not exists lng double precision;
 alter table if exists public.listings add column if not exists village text;
 alter table if exists public.listings add column if not exists district text;
-alter table if exists public.listings add column if not exists haat_name text;
 alter table if exists public.listings add column if not exists rating numeric(3,2) default 4.8;
 alter table if exists public.listings add column if not exists status text default 'active';
 alter table if exists public.listings add column if not exists is_organic boolean default true;
@@ -288,7 +256,7 @@ create table if not exists public.notifications (
   title_as text not null,
   body_en text not null,
   body_as text not null,
-  type text default 'order_update' check (type in ('order_update', 'seller_status', 'haat_alert', 'promotional', 'system')),
+  type text default 'order_update' check (type in ('order_update', 'seller_status', 'promotional', 'system')),
   data jsonb default '{}'::jsonb,
   is_read boolean default false,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
@@ -371,7 +339,6 @@ returns table (
   lng double precision,
   village text,
   district text,
-  haat_name text,
   rating numeric,
   status text,
   is_organic boolean,
@@ -401,7 +368,6 @@ as $$
     l.lng,
     l.village,
     l.district,
-    l.haat_name,
     l.rating,
     l.status,
     l.is_organic,
@@ -432,63 +398,8 @@ as $$
   order by distance_km asc;
 $$;
 
--- Function to find nearby weekly haat markets
-create or replace function get_nearby_haats(
-  user_lat double precision,
-  user_lng double precision,
-  radius_km double precision default 50.0
-)
-returns table (
-  id text,
-  name_en text,
-  name_as text,
-  district text,
-  location text,
-  market_day text,
-  market_day_as text,
-  timings text,
-  specialty_en text,
-  specialty_as text,
-  active_sellers_count integer,
-  lat double precision,
-  lng double precision,
-  image_url text,
-  created_at timestamp with time zone,
-  distance_km double precision
-)
-language sql stable
-as $$
-  select
-    h.id,
-    h.name_en,
-    h.name_as,
-    h.district,
-    h.location,
-    h.market_day,
-    h.market_day_as,
-    h.timings,
-    h.specialty_en,
-    h.specialty_as,
-    h.active_sellers_count,
-    h.lat,
-    h.lng,
-    h.image_url,
-    h.created_at,
-    round(
-      (st_distance(
-        st_setsrid(st_makepoint(h.lng, h.lat), 4326)::geography,
-        st_setsrid(st_makepoint(user_lng, user_lat), 4326)::geography
-      ) / 1000.0)::numeric, 1
-    )::double precision as distance_km
-  from public.haat_markets h
-  where (
-    st_distance(
-      st_setsrid(st_makepoint(h.lng, h.lat), 4326)::geography,
-      st_setsrid(st_makepoint(user_lng, user_lat), 4326)::geography
-    ) / 1000.0
-  ) <= radius_km
-  order by distance_km asc;
-$$;
+-- Dropped get_nearby_haats
+drop function if exists get_nearby_haats(double precision, double precision, double precision);
 
 -- ==========================================================
 -- AUTOMATIC DATABASE TRIGGERS
@@ -529,7 +440,7 @@ begin
     set
       today_sales = today_sales + new.total,
       total_orders = total_orders + 1
-    where id::text = new.seller_id or user_id::text = new.seller_id;
+    where id::text = new.seller_id::text or user_id::text = new.seller_id::text;
   end if;
   return new;
 end;
@@ -546,7 +457,6 @@ for each row execute function update_seller_stats_on_order_complete();
 alter table public.users enable row level security;
 alter table public.seller_profiles enable row level security;
 alter table public.categories enable row level security;
-alter table public.haat_markets enable row level security;
 alter table public.listings enable row level security;
 alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
@@ -563,15 +473,6 @@ drop policy if exists "Allow update categories" on public.categories;
 create policy "Allow public read categories" on public.categories for select using (true);
 create policy "Allow insert categories" on public.categories for insert with check (true);
 create policy "Allow update categories" on public.categories for update using (true);
-
-drop policy if exists "Allow public read haats" on public.haat_markets;
-drop policy if exists "Allow public read on haats" on public.haat_markets;
-drop policy if exists "Allow public read on haat_markets" on public.haat_markets;
-drop policy if exists "Allow insert haats" on public.haat_markets;
-drop policy if exists "Allow update haats" on public.haat_markets;
-create policy "Allow public read haats" on public.haat_markets for select using (true);
-create policy "Allow insert haats" on public.haat_markets for insert with check (true);
-create policy "Allow update haats" on public.haat_markets for update using (true);
 
 drop policy if exists "Allow public read listings" on public.listings;
 drop policy if exists "Allow public read on listings" on public.listings;

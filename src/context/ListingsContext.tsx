@@ -1,13 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Listing, ProductCategory, HaatMarket, ContactUnlock } from '../types';
-import { INITIAL_LISTINGS, INITIAL_CATEGORIES, INITIAL_HAATS } from '../constants/mockData';
+import { Listing, ProductCategory, ContactUnlock } from '../types';
+import { INITIAL_LISTINGS, INITIAL_CATEGORIES } from '../constants/mockData';
 import { calculateDistanceKm, DEFAULT_COORDS } from '../lib/location';
 import { supabase } from '../lib/supabase';
 
 interface ListingsContextType {
   listings: Listing[];
   categories: ProductCategory[];
-  haats: HaatMarket[];
   radiusKm: number;
   setRadiusKm: (radius: number) => void;
   selectedCategory: string | null;
@@ -32,7 +31,6 @@ const ListingsContext = createContext<ListingsContextType | undefined>(undefined
 export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [listings, setListings] = useState<Listing[]>(INITIAL_LISTINGS);
   const [categories, setCategories] = useState<ProductCategory[]>(INITIAL_CATEGORIES);
-  const [haats, setHaats] = useState<HaatMarket[]>(INITIAL_HAATS);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   
   // Radius filter state (1km to 25km, default 15km)
@@ -46,10 +44,67 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Wishlist state
   const [wishlist, setWishlist] = useState<string[]>(['l1', 'l3']);
 
+  const mapDbListing = (row: any): Listing => ({
+    id: row.id.toString(),
+    seller_id: row.seller_id || 's1',
+    seller_name: row.seller_name || 'Village Farmer',
+    seller_type: row.seller_type || 'shg_member',
+    seller_phone: row.seller_phone || '+91 94350 00000',
+    category_id: row.category_id || 'c1',
+    category_name_en: row.category_name_en || 'Vegetables',
+    category_name_as: row.category_name_as || 'শাক-পাচলি',
+    title_en: row.title_en,
+    title_as: row.title_as,
+    description_en: row.description_en || '',
+    description_as: row.description_as || '',
+    price: Number(row.price),
+    unit: row.unit || 'kg',
+    stock: row.stock || 10,
+    image_url: row.image_url,
+    lat: Number(row.lat || DEFAULT_COORDS.lat),
+    lng: Number(row.lng || DEFAULT_COORDS.lng),
+    village: row.village || 'Mangaldai',
+    district: row.district || 'Darrang',
+    rating: Number(row.rating || 4.8),
+    status: row.status || 'active',
+    is_organic: row.is_organic ?? true,
+    created_at: row.created_at || new Date().toISOString(),
+  });
+
+  const fetchLiveListings = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        const mapped = data.map(mapDbListing);
+        setListings(mapped);
+      }
+    } catch (err) {
+      console.log('Supabase listings fetch error, using local data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchLiveCategories = async () => {
+    try {
+      const { data } = await supabase.from('categories').select('*');
+      if (data && data.length > 0) {
+        setCategories(data);
+      }
+    } catch {
+      // offline fallback
+    }
+  };
+
   // Fetch initial data from Supabase
   useEffect(() => {
     fetchLiveListings();
-    fetchLiveCategoriesAndHaats();
+    fetchLiveCategories();
 
     // Subscribe to realtime updates on listings
     const channel = supabase
@@ -75,78 +130,6 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       supabase.removeChannel(channel);
     };
   }, []);
-
-  const mapDbListing = (row: any): Listing => ({
-    id: row.id.toString(),
-    seller_id: row.seller_id || 's1',
-    seller_name: row.seller_name || 'Village Farmer',
-    seller_type: row.seller_type || 'shg_member',
-    seller_phone: row.seller_phone || '+91 94350 00000',
-    category_id: row.category_id || 'c1',
-    category_name_en: row.category_name_en || 'Vegetables',
-    category_name_as: row.category_name_as || 'শাক-পাচলি',
-    title_en: row.title_en,
-    title_as: row.title_as,
-    description_en: row.description_en || '',
-    description_as: row.description_as || '',
-    price: Number(row.price),
-    unit: row.unit || 'kg',
-    stock: row.stock || 10,
-    image_url: row.image_url,
-    lat: Number(row.lat || DEFAULT_COORDS.lat),
-    lng: Number(row.lng || DEFAULT_COORDS.lng),
-    village: row.village || 'Mangaldai',
-    district: row.district || 'Darrang',
-    haat_name: row.haat_name,
-    rating: Number(row.rating || 4.8),
-    status: row.status || 'active',
-    is_organic: row.is_organic ?? true,
-    created_at: row.created_at || new Date().toISOString(),
-  });
-
-  const fetchLiveListings = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('listings')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (!error && data && data.length > 0) {
-        const mapped = data.map(mapDbListing);
-        // Merge with initial mock data if mock data has items not in db
-        setListings(mapped);
-      }
-    } catch (err) {
-      console.log('Supabase listings fetch error, using local data:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchLiveCategoriesAndHaats = async () => {
-    try {
-      const [catsRes, haatsRes] = await Promise.all([
-        supabase.from('categories').select('*'),
-        supabase.from('haat_markets').select('*'),
-      ]);
-
-      if (catsRes.data && catsRes.data.length > 0) {
-        setCategories(catsRes.data);
-      }
-      if (haatsRes.data && haatsRes.data.length > 0) {
-        setHaats(
-          haatsRes.data.map((h: any) => ({
-            ...h,
-            lat: Number(h.lat),
-            lng: Number(h.lng),
-          }))
-        );
-      }
-    } catch (e) {
-      // offline fallback
-    }
-  };
 
   const toggleWishlist = (listingId: string) => {
     setWishlist((prev) =>
@@ -220,7 +203,6 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           lng: listingData.lng,
           village: listingData.village,
           district: listingData.district,
-          haat_name: listingData.haat_name,
           rating: 4.8,
           status: 'active',
           is_organic: listingData.is_organic ?? true,
@@ -300,7 +282,6 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       value={{
         listings,
         categories,
-        haats,
         radiusKm,
         setRadiusKm,
         selectedCategory,

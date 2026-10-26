@@ -30,7 +30,7 @@ export default function RootLayout() {
                     }}
                   >
                     <Stack.Screen name="index" />
-                    <Stack.Screen name="(auth)/login" />
+                    <Stack.Screen name="(auth)" />
                     <Stack.Screen name="(tabs)" />
                     <Stack.Screen name="product/[id]" />
                     <Stack.Screen name="checkout/index" />
@@ -50,7 +50,6 @@ export default function RootLayout() {
                     <Stack.Screen name="addresses" />
                     <Stack.Screen name="support" />
                     <Stack.Screen name="settings" />
-                    <Stack.Screen name="admin/index" />
                   </Stack>
                 </OrderProvider>
               </CartProvider>

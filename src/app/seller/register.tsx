@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, ArrowRight, Store, Users, User, Building } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Users, User, Building } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
@@ -24,12 +24,12 @@ export default function SellerRegisterScreen() {
   const { language, t } = useLanguage();
   const { registerSeller } = useAuth();
 
-  const [businessName, setBusinessName] = useState('Pragjyotishpur Mahila SHG');
+  const [businessName, setBusinessName] = useState('');
   const [sellerType, setSellerType] = useState<SellerType>('shg_member');
-  const [shgCode, setShgCode] = useState('AS-DRG-SHG-2023-889');
-  const [village, setVillage] = useState('Deomornoi');
+  const [shgCode, setShgCode] = useState('');
+  const [village, setVillage] = useState('');
   const [district, setDistrict] = useState('Darrang');
-  const [upiId, setUpiId] = useState('pragjyotishpur@okaxis');
+  const [upiId, setUpiId] = useState('');
 
   const handleNext = async () => {
     triggerHaptic('medium');

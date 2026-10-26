@@ -59,7 +59,7 @@ export function broadcastAll(event: string, payload: any) {
   }
 }
 
-server.listen(ENV.PORT, () => {
+server.listen(ENV.PORT, '0.0.0.0', () => {
   console.log(`\n======================================================`);
   console.log(`🌿 Thaluwa Bazar Backend Server (থলুৱা বজাৰ)`);
   console.log(`🚀 REST API:   http://localhost:${ENV.PORT}/api/v1`);

@@ -203,11 +203,6 @@ export default function ProductDetailScreen() {
                 <Text style={styles.sellerLocation}>
                   📍 {listing.village}, {listing.district}
                 </Text>
-                {listing.haat_name && (
-                  <Text style={styles.haatLink}>
-                    🏛️ Associated with {listing.haat_name}
-                  </Text>
-                )}
               </View>
             </View>
 
@@ -473,12 +468,6 @@ const styles = StyleSheet.create({
   sellerLocation: {
     fontSize: 11,
     color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  haatLink: {
-    fontSize: 10,
-    color: COLORS.secondary,
-    fontWeight: '600',
     marginTop: 2,
   },
   bottomBar: {

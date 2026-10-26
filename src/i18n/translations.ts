@@ -40,7 +40,6 @@ export const TRANSLATIONS = {
     
     // Navigation Tabs
     tabHome: 'Explore',
-    tabHaats: 'Haats',
     tabOrders: 'Orders',
     tabCart: 'Cart',
     tabProfile: 'Profile',
@@ -52,7 +51,6 @@ export const TRANSLATIONS = {
     withinRadius: 'Within',
     categories: 'Categories',
     popularProducts: 'Popular Products Nearby',
-    weeklyHaats: 'Traditional Haats (Market Hubs)',
     
     // Product Detail
     addToCart: 'Add to Cart',
@@ -73,7 +71,7 @@ export const TRANSLATIONS = {
     homeDelivery: 'Home Delivery',
     homeDeliveryDesc: 'Direct delivery at your address',
     pickup: 'Pick Up',
-    pickupDesc: 'Collect directly from producer / haat',
+    pickupDesc: 'Collect directly from producer',
     promoCode: 'Promo Code',
     apply: 'Apply',
     subtotal: 'Subtotal',
@@ -189,7 +187,6 @@ export const TRANSLATIONS = {
     
     // Navigation Tabs
     tabHome: 'বজাৰ',
-    tabHaats: 'সাপ্তাহিক হাট',
     tabOrders: 'অৰ্ডাৰ',
     tabCart: 'কাৰ্ট',
     tabProfile: 'প্ৰফাইল',
@@ -201,7 +198,6 @@ export const TRANSLATIONS = {
     withinRadius: 'ভিতৰত',
     categories: 'শ্ৰেণীসমূহ',
     popularProducts: 'ওচৰৰ জনপ্ৰিয় সামগ্ৰী',
-    weeklyHaats: 'পৰম্পৰাগত সাপ্তাহিক হাট',
     
     // Product Detail
     addToCart: 'কাৰ্টত যোগ কৰক',
@@ -222,7 +218,7 @@ export const TRANSLATIONS = {
     homeDelivery: 'ঘৰলৈ পঠিওৱা (Home Delivery)',
     homeDeliveryDesc: 'আপোনাৰ ঠিকনাত পোনে পোনে বিতৰণ',
     pickup: 'নিজে গৈ লোৱা (Pick Up)',
-    pickupDesc: 'উৎপাদক বা হাটৰ পৰা সংগ্ৰহ কৰক',
+    pickupDesc: 'উৎপাদকৰ পৰা সংগ্ৰহ কৰক',
     promoCode: 'কুপন ক’ড',
     apply: 'প্ৰয়োগ কৰক',
     subtotal: 'মুঠ মূল্য',

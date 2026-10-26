@@ -65,18 +65,7 @@ export interface Order {
   items: OrderItem[];
 }
 
-export interface HaatMarket {
-  id: string;
-  name_en: string;
-  name_as: string;
-  district: string;
-  location: string;
-  market_day: string;
-  is_active: boolean;
-  coordinator_name: string;
-  coordinator_phone: string;
-  active_stalls_count: number;
-}
+
 
 export interface PayoutRecord {
   id: string;
@@ -93,6 +82,7 @@ export interface PayoutRecord {
 
 export interface AuditLog {
   id: string;
+  actor_id?: string;
   actor_name: string;
   actor_role: string;
   action: string;
@@ -100,9 +90,12 @@ export interface AuditLog {
   entity_id: string;
   details: string;
   timestamp: string;
+  metadata?: Record<string, any>;
+  ip_address?: string;
+  user_agent?: string;
 }
 
-const API_BASE = 'http://localhost:5000/api/v1';
+const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 // Initial Mock Datasets
 let mockStats: AdminStats = {
@@ -219,7 +212,7 @@ let mockSellers: SellerProfile[] = [
     seller_type: 'individual_farmer',
     verification_status: 'verified',
     district: 'Darrang',
-    address: 'Haat Road, Kharupetia, Darrang, Assam',
+    address: 'Station Road, Kharupetia, Darrang, Assam',
     bank_account_no: '•••• •••• 7741',
     ifsc_code: 'SBIN0005432',
     upi_id: 'kharupetia.fresh@sbi',
@@ -325,56 +318,7 @@ let mockOrders: Order[] = [
   },
 ];
 
-let mockHaats: HaatMarket[] = [
-  {
-    id: 'haat-1',
-    name_en: 'Mangaldai Bi-Weekly Haat',
-    name_as: 'মঙলদৈ সাপ্তাহিক হাট',
-    district: 'Darrang',
-    location: 'Mangaldai Town Center, Darrang',
-    market_day: 'Every Wednesday & Saturday',
-    is_active: true,
-    coordinator_name: 'Hemanta Deka',
-    coordinator_phone: '+91 98540 11223',
-    active_stalls_count: 64,
-  },
-  {
-    id: 'haat-2',
-    name_en: 'Sipajhar Rural Farmers Hub',
-    name_as: 'ছিপাজাৰ কৃষক হাট',
-    district: 'Darrang',
-    location: 'Sipajhar Chariali, NH-15',
-    market_day: 'Every Sunday',
-    is_active: true,
-    coordinator_name: 'Ramen Nath',
-    coordinator_phone: '+91 94350 44556',
-    active_stalls_count: 48,
-  },
-  {
-    id: 'haat-3',
-    name_en: 'Kharupetia Agri Super Market',
-    name_as: 'খাৰুপেটীয়া পাইকাৰী বজাৰ',
-    district: 'Darrang',
-    location: 'Kharupetia Town Mandi',
-    market_day: 'Daily (Morning 5 AM - 11 AM)',
-    is_active: true,
-    coordinator_name: 'Abdul Rashid',
-    coordinator_phone: '+91 98641 77889',
-    active_stalls_count: 120,
-  },
-  {
-    id: 'haat-4',
-    name_en: 'Tangla Tribal Crafts & Handloom Haat',
-    name_as: 'তাংলা জনজাতীয় হস্তশিল্প হাট',
-    district: 'Udalguri / Darrang Border',
-    location: 'Tangla Railway Market Yard',
-    market_day: 'Every Tuesday & Friday',
-    is_active: true,
-    coordinator_name: 'Biren Boro',
-    coordinator_phone: '+91 91012 88990',
-    active_stalls_count: 35,
-  },
-];
+
 
 let mockPayouts: PayoutRecord[] = [
   {
@@ -468,26 +412,29 @@ export const AdminApi = {
   // Fetch Pending & All Sellers
   async getSellers(filter?: string): Promise<SellerProfile[]> {
     try {
-      if (filter === 'pending') {
-        const res = await fetch(`${API_BASE}/admin/pending-sellers`, { signal: AbortSignal.timeout(3000) });
-        if (res.ok) {
-          const json = await res.json();
-          if (json.success && json.pending_sellers?.length) {
-            return json.pending_sellers.map((s: any) => ({
-              id: s.id,
-              user_id: s.user_id,
-              business_name: s.business_name || s.users?.name || 'Local Seller',
-              shg_code: s.shg_code || 'SHG-MEMBER',
-              seller_type: s.seller_type || 'shg_member',
-              verification_status: s.verification_status || 'pending',
-              district: s.district || 'Assam',
-              address: s.address,
-              rating: s.rating || 4.5,
-              delivery_radius_km: s.delivery_radius_km || 15,
-              created_at: s.created_at || new Date().toISOString(),
-              users: s.users,
-            }));
-          }
+      const url = filter && filter !== 'all' ? `${API_BASE}/admin/sellers?status=${filter}` : `${API_BASE}/admin/sellers`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const json = await res.json();
+        const sellerList = json.sellers || json.pending_sellers;
+        if (json.success && Array.isArray(sellerList) && sellerList.length > 0) {
+          return sellerList.map((s: any) => ({
+            id: s.id,
+            user_id: s.user_id,
+            business_name: s.business_name || s.users?.name || 'Local Seller',
+            shg_code: s.shg_code || 'SHG-MEMBER',
+            seller_type: s.seller_type || 'shg_member',
+            verification_status: s.verification_status || 'pending',
+            district: s.district || 'Assam',
+            address: s.address,
+            bank_account_no: s.bank_account || s.bank_account_no,
+            ifsc_code: s.bank_ifsc || s.ifsc_code,
+            upi_id: s.upi_id,
+            rating: s.rating || 4.5,
+            delivery_radius_km: s.delivery_radius_km || 15,
+            created_at: s.created_at || new Date().toISOString(),
+            users: s.users,
+          }));
         }
       }
     } catch {
@@ -546,8 +493,11 @@ export const AdminApi = {
       const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
       if (res.ok) {
         const json = await res.json();
-        if (json.success && json.orders?.length) {
-          return json.orders;
+        if (json.success && Array.isArray(json.orders) && json.orders.length > 0) {
+          return json.orders.map((o: any) => ({
+            ...o,
+            items: o.items || o.order_items || [],
+          }));
         }
       }
     } catch {
@@ -562,6 +512,17 @@ export const AdminApi = {
 
   // Override Order Status
   async overrideOrderStatus(orderId: string, newStatus: Order['status'], reason: string): Promise<boolean> {
+    try {
+      await fetch(`${API_BASE}/admin/orders/${orderId}/override`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, reason }),
+        signal: AbortSignal.timeout(3000),
+      });
+    } catch {
+      // Local fallback
+    }
+
     const order = mockOrders.find((o) => o.id === orderId);
     if (order) {
       order.status = newStatus;
@@ -577,33 +538,45 @@ export const AdminApi = {
       });
       return true;
     }
-    return false;
+    return true;
   },
 
-  // Fetch Haats
-  async getHaats(): Promise<HaatMarket[]> {
-    return mockHaats;
-  },
 
-  // Toggle Haat Status
-  async toggleHaatStatus(haatId: string): Promise<boolean> {
-    const haat = mockHaats.find((h) => h.id === haatId);
-    if (haat) {
-      haat.is_active = !haat.is_active;
-      return true;
-    }
-    return false;
-  },
 
   // Fetch Payouts
   async getPayouts(): Promise<PayoutRecord[]> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/payouts`, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.payouts) && json.payouts.length > 0) {
+          return json.payouts;
+        }
+      }
+    } catch {
+      // Fallback
+    }
     return mockPayouts;
   },
 
   // Trigger Batch Payout
   async disbursePayout(payoutId: string): Promise<{ utr: string }> {
+    let utr = `UTR${Date.now().toString().slice(-8)}${Math.floor(1000 + Math.random() * 9000)}`;
+    try {
+      const res = await fetch(`${API_BASE}/admin/payouts/${payoutId}/disburse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(3000),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.utr) utr = json.utr;
+      }
+    } catch {
+      // Local fallback
+    }
+
     const payout = mockPayouts.find((p) => p.id === payoutId);
-    const utr = `UTR${Date.now().toString().slice(-8)}${Math.floor(1000 + Math.random() * 9000)}`;
     if (payout) {
       payout.status = 'processed';
       payout.utr_ref = utr;
@@ -623,8 +596,98 @@ export const AdminApi = {
     return { utr };
   },
 
-  // Fetch Audit Logs
-  async getAuditLogs(): Promise<AuditLog[]> {
-    return mockAuditLogs;
+  // Fetch Audit Logs with Live Filtering & Search
+  async getAuditLogs(filters?: { search?: string; action?: string; entity?: string }): Promise<AuditLog[]> {
+    try {
+      const params = new URLSearchParams();
+      if (filters?.search) params.append('search', filters.search);
+      if (filters?.action && filters.action !== 'all') params.append('action', filters.action);
+      if (filters?.entity && filters.entity !== 'all') params.append('entity', filters.entity);
+      params.append('limit', '150');
+
+      const res = await fetch(`${API_BASE}/admin/audit-logs?${params.toString()}`, {
+        signal: AbortSignal.timeout(3500),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.logs) && json.logs.length > 0) {
+          return json.logs;
+        }
+      }
+    } catch {
+      // Local fallback
+    }
+
+    let logs = [...mockAuditLogs];
+    if (filters?.action && filters.action !== 'all') {
+      logs = logs.filter((l) => l.action.toLowerCase() === filters.action!.toLowerCase());
+    }
+    if (filters?.entity && filters.entity !== 'all') {
+      logs = logs.filter((l) => l.entity.toLowerCase() === filters.entity!.toLowerCase());
+    }
+    if (filters?.search) {
+      const q = filters.search.toLowerCase();
+      logs = logs.filter(
+        (l) =>
+          l.actor_name.toLowerCase().includes(q) ||
+          l.action.toLowerCase().includes(q) ||
+          l.entity.toLowerCase().includes(q) ||
+          l.entity_id.toLowerCase().includes(q) ||
+          l.details.toLowerCase().includes(q) ||
+          (l.actor_id && l.actor_id.toLowerCase().includes(q))
+      );
+    }
+    return logs;
+  },
+
+  // Record Audit Log Entry directly
+  async recordAuditLog(entry: {
+    action: string;
+    entity: string;
+    entity_id: string;
+    details: string;
+    metadata?: Record<string, any>;
+    actor_id?: string;
+    actor_name?: string;
+    actor_role?: string;
+  }): Promise<AuditLog> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/audit-logs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-id': entry.actor_id || 'adm-console-01',
+          'x-admin-name': entry.actor_name || 'Admin Officer (Utkarsh)',
+          'x-admin-role': entry.actor_role || 'Super Admin',
+        },
+        body: JSON.stringify(entry),
+        signal: AbortSignal.timeout(3500),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.log) {
+          mockAuditLogs.unshift(json.log);
+          return json.log;
+        }
+      }
+    } catch {
+      // Local fallback
+    }
+
+    const localLog: AuditLog = {
+      id: `aud-${Date.now()}`,
+      actor_id: entry.actor_id || 'adm-console-01',
+      actor_name: entry.actor_name || 'Admin Officer (Utkarsh)',
+      actor_role: entry.actor_role || 'Super Admin',
+      action: entry.action,
+      entity: entry.entity,
+      entity_id: entry.entity_id,
+      details: entry.details,
+      timestamp: new Date().toISOString(),
+      metadata: entry.metadata,
+    };
+    mockAuditLogs.unshift(localLog);
+    return localLog;
   },
 };
+

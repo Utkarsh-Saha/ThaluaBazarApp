@@ -17,9 +17,7 @@ import {
   Sparkles,
   Calendar,
   CreditCard,
-  ShieldCheck,
   Zap,
-  ArrowRight,
   X,
   QrCode,
 } from 'lucide-react-native';
@@ -64,7 +62,14 @@ export default function SellerSubscriptionScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
-          onPress={() => router.back()}
+          onPress={() => {
+            triggerHaptic('light');
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/seller/dashboard');
+            }
+          }}
           activeOpacity={0.7}
         >
           <ArrowLeft size={22} color={COLORS.text} />
@@ -83,7 +88,9 @@ export default function SellerSubscriptionScreen() {
           <View style={styles.planHeader}>
             <View>
               <Text style={styles.planLabel}>
-                {language === 'as' ? 'বৰ্তমানৰ পৰিকল্পনা' : 'Current Plan'}
+                {sellerProfile?.business_name
+                  ? `${sellerProfile.business_name} • ${language === 'as' ? 'বৰ্তমানৰ পৰিকল্পনা' : 'Current Plan'}`
+                  : (language === 'as' ? 'বৰ্তমানৰ পৰিকল্পনা' : 'Current Plan')}
               </Text>
               <Text style={styles.activePlanName}>
                 {language === 'as' ? 'বেছিক প্লেন (Basic Plan)' : 'Basic Producer Plan'}
@@ -189,7 +196,7 @@ export default function SellerSubscriptionScreen() {
             </View>
             <View style={styles.featureRow}>
               <CheckCircle size={14} color={COLORS.secondary} />
-              <Text style={styles.featureText}>Featured banner spotlight in Weekly Haats</Text>
+              <Text style={styles.featureText}>Featured banner spotlight in Explore Feed</Text>
             </View>
             <View style={styles.featureRow}>
               <CheckCircle size={14} color={COLORS.secondary} />

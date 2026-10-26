@@ -9,7 +9,13 @@
     }
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx"
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "backend",
+    "admin-panel",
+    "dist"
   ]
 }

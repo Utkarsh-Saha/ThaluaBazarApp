@@ -30,18 +30,16 @@ export default function AddProductScreen() {
   const { sellerProfile } = useAuth();
   const { categories, addNewListing } = useListings();
 
-  const [titleEn, setTitleEn] = useState('Organic Kaji Nemu (Assam Lemon)');
-  const [titleAs, setTitleAs] = useState('সতেজ অসমীয়া কাজি নেমু');
-  const [descEn, setDescEn] = useState('Freshly plucked organic Assam lemon with intense aroma and juice.');
-  const [descAs, setDescAs] = useState('বাৰীৰ সতেজ সুগন্ধি কাজি নেমু। অধিক ৰস আৰু ৰোগ প্ৰতিৰোধক ক্ষমতাযুক্ত।');
+  const [titleEn, setTitleEn] = useState('');
+  const [titleAs, setTitleAs] = useState('');
+  const [descEn, setDescEn] = useState('');
+  const [descAs, setDescAs] = useState('');
   const [categoryId, setCategoryId] = useState('c1');
-  const [price, setPrice] = useState('60');
+  const [price, setPrice] = useState('');
   const [unit, setUnit] = useState('kg');
-  const [stock, setStock] = useState('25');
-  const [isOrganic, setIsOrganic] = useState(true);
-  const [imageUrl, setImageUrl] = useState(
-    'https://images.unsplash.com/photo-1590502593747-42a996133562?auto=format&fit=crop&w=600&q=80'
-  );
+  const [stock, setStock] = useState('');
+  const [isOrganic, setIsOrganic] = useState(false);
+  const [imageUrl, setImageUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 

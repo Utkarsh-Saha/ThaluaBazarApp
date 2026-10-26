@@ -20,9 +20,6 @@ import {
   ChevronUp,
   Send,
   HelpCircle,
-  ShieldCheck,
-  Clock,
-  MapPin,
 } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useLanguage } from '../context/LanguageContext';
@@ -41,7 +38,7 @@ const FAQS: FAQItem[] = [
     id: 'f1',
     q_en: 'How does hyperlocal delivery work in Assam?',
     q_as: 'অসমত হাইপাৰলোকেল ডেলিভাৰী কেনেকৈ কাম কৰে?',
-    a_en: 'Products are sourced directly from producers within a 1–25 km radius of your location. You can choose home delivery by local riders or self-pickup from the producer/haat.',
+    a_en: 'Products are sourced directly from producers within a 1–25 km radius of your location. You can choose home delivery by local riders or self-pickup from the producer.',
     a_as: 'আপোনাৰ স্থানৰ পৰা ১-২৫ কিঃমিঃ ব্যাসাৰ্ধৰ ভিতৰৰ কৃষক আৰু আত্মসহায়ক গোটৰ পৰা সামগ্ৰী পোনে পোনে যোগান ধৰা হয়। আপুনি হোম ডেলিভাৰী বা নিজেই সংগ্ৰহ কৰিব পাৰে।',
   },
   {

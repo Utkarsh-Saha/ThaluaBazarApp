@@ -1,0 +1,32 @@
+[
+  {
+    "id": "aud_sys_1001",
+    "timestamp": "2026-10-22T21:37:38.435Z",
+    "actor_id": "admin_sys_root",
+    "actor_name": "System Root",
+    "actor_role": "Super Admin",
+    "action": "PLATFORM_INITIALIZATION",
+    "entity": "system_config",
+    "entity_id": "sys-core",
+    "details": "Initialized Thaluwa Bazar operational engine with secure audit logging protocol.",
+    "metadata": {
+      "version": "1.0.0",
+      "environment": "development"
+    }
+  },
+  {
+    "id": "aud_sys_1002",
+    "timestamp": "2026-10-25T09:37:38.436Z",
+    "actor_id": "adm_utkarsh_01",
+    "actor_name": "Admin Officer (Utkarsh)",
+    "actor_role": "Super Admin",
+    "action": "SECURITY_AUDIT_ENABLED",
+    "entity": "security_policy",
+    "entity_id": "sec-pol-01",
+    "details": "Activated multi-factor admin audit console and real-time ledger tracking.",
+    "metadata": {
+      "real_time_sync": true,
+      "broadcast_channel": "admin_audit"
+    }
+  }
+]

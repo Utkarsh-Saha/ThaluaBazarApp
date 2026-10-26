@@ -27,7 +27,6 @@ backend/
 │   │   ├── adminController.ts
 │   │   ├── authController.ts
 │   │   ├── categoriesController.ts
-│   │   ├── haatsController.ts
 │   │   ├── listingsController.ts
 │   │   ├── notificationsController.ts
 │   │   ├── ordersController.ts
@@ -44,7 +43,6 @@ backend/
 │   │   ├── adminRoutes.ts
 │   │   ├── authRoutes.ts
 │   │   ├── categoriesRoutes.ts
-│   │   ├── haatsRoutes.ts
 │   │   ├── listingsRoutes.ts
 │   │   ├── notificationsRoutes.ts
 │   │   ├── ordersRoutes.ts
@@ -120,8 +118,7 @@ The API will be available at `http://localhost:5000/api/v1` and WebSocket at `ws
 - `POST /api/v1/admin/verify-seller/:id` — Approve or reject seller application
 - `GET /api/v1/admin/orders` — Platform-wide orders log
 
-### 🏛️ Haats & Categories
-- `GET /api/v1/haats?lat=...&lng=...` — Nearby weekly haats
+### 📦 Categories
 - `GET /api/v1/categories` — Marketplace product categories
 
 ### 🔔 Notifications & Reviews

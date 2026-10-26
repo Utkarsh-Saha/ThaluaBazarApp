@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet } from 'react-native';
-import { Compass, Store, ShoppingBag, ShoppingCart, User } from 'lucide-react-native';
+import { View, Text, StyleSheet, BackHandler } from 'react-native';
+import { Compass, ShoppingBag, ShoppingCart, User } from 'lucide-react-native';
 import { COLORS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
 import { useCart } from '../../context/CartContext';
@@ -9,6 +9,15 @@ import { useCart } from '../../context/CartContext';
 export default function TabLayout() {
   const { language, t } = useLanguage();
   const { itemCount } = useCart();
+
+  useEffect(() => {
+    const onBackPress = () => {
+      // Prevent hardware back button from returning authenticated user to auth/login screens
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, []);
 
   return (
     <Tabs
@@ -39,15 +48,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="haats"
-        options={{
-          title: t('tabHaats'),
-          tabBarIcon: ({ color, focused }) => (
-            <Store size={22} color={color} strokeWidth={focused ? 2.5 : 2} />
-          ),
-        }}
-      />
+
       <Tabs.Screen
         name="orders"
         options={{
