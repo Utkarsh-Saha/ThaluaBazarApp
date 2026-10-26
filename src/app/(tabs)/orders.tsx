@@ -163,6 +163,25 @@ export default function OrdersScreen() {
                         {item.status.replace('_', ' ')}
                       </Text>
                     </View>
+                    <View
+                      style={[
+                        styles.statusTag,
+                        {
+                          marginLeft: 6,
+                          backgroundColor: item.payment_status === 'paid' ? '#ECFDF5' : '#FFFBEB',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: '700',
+                          color: item.payment_status === 'paid' ? '#047857' : '#B45309',
+                        }}
+                      >
+                        {item.payment_status === 'paid' ? 'PAID' : 'COD'}
+                      </Text>
+                    </View>
                   </View>
                   <Text style={styles.sellerName}>🌱 {item.seller_name}</Text>
                   <Text style={styles.dateText}>

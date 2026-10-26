@@ -182,6 +182,23 @@ export default function SellerOrdersScreen() {
                       {item.status.replace('_', ' ')}
                     </Text>
                   </View>
+                  <View style={[
+                    styles.statusBadge,
+                    {
+                      marginTop: 4,
+                      backgroundColor: item.payment_status === 'paid' ? '#ECFDF5' : '#FFFBEB',
+                    }
+                  ]}>
+                    <Text style={[
+                      styles.statusBadgeText,
+                      {
+                        fontSize: 9,
+                        color: item.payment_status === 'paid' ? '#047857' : '#B45309',
+                      }
+                    ]}>
+                      {item.payment_status === 'paid' ? 'PAID (ONLINE)' : 'COD (COLLECT CASH)'}
+                    </Text>
+                  </View>
                 </View>
               </View>
 

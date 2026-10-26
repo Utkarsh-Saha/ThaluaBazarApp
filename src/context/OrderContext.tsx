@@ -12,7 +12,12 @@ interface OrderContextType {
     buyer: User,
     deliveryType: DeliveryType,
     deliveryAddress: string,
-    paymentMethod: 'upi' | 'card' | 'cod' | 'netbanking'
+    paymentMethod: 'upi' | 'card' | 'cod' | 'netbanking',
+    paymentDetails?: {
+      razorpay_order_id?: string;
+      razorpay_payment_id?: string;
+      payment_status?: 'pending' | 'paid';
+    }
   ) => Promise<Order>;
   updateOrderStatus: (orderId: string, nextStatus: OrderStatus) => Promise<void>;
   getOrderById: (orderId: string) => Order | undefined;
@@ -73,6 +78,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       delivery_address: row.delivery_address,
       payment_method: row.payment_method || 'cod',
       payment_status: row.payment_status || 'pending',
+      razorpay_order_id: row.razorpay_order_id,
+      razorpay_payment_id: row.razorpay_payment_id,
       created_at: row.created_at || new Date().toISOString(),
       estimated_delivery: row.estimated_delivery || 'Within 2 hours',
     };
@@ -130,7 +137,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     buyer: User,
     deliveryType: DeliveryType,
     deliveryAddress: string,
-    paymentMethod: 'upi' | 'card' | 'cod' | 'netbanking'
+    paymentMethod: 'upi' | 'card' | 'cod' | 'netbanking',
+    paymentDetails?: {
+      razorpay_order_id?: string;
+      razorpay_payment_id?: string;
+      payment_status?: 'pending' | 'paid';
+    }
   ): Promise<Order> => {
     triggerHaptic('success');
 
@@ -139,6 +151,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const deliveryFee = deliveryType === 'pickup' || subtotal >= 500 ? 0 : 30;
     const total = subtotal + deliveryFee;
     const orderNumber = `#TB-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const paymentStatus = paymentDetails?.payment_status || (paymentMethod === 'cod' ? 'pending' : 'paid');
 
     const newOrder: Order = {
       id: `ord-${Date.now()}`,
@@ -168,7 +182,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       pickup_or_delivery: deliveryType,
       delivery_address: deliveryAddress,
       payment_method: paymentMethod,
-      payment_status: paymentMethod === 'cod' ? 'pending' : 'paid',
+      payment_status: paymentStatus,
+      razorpay_order_id: paymentDetails?.razorpay_order_id,
+      razorpay_payment_id: paymentDetails?.razorpay_payment_id,
       created_at: new Date().toISOString(),
       estimated_delivery: deliveryType === 'pickup' ? 'Ready in 1 hour' : 'Today, within 2 hours',
     };
@@ -196,7 +212,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             pickup_or_delivery: deliveryType,
             delivery_address: deliveryAddress,
             payment_method: paymentMethod,
-            payment_status: paymentMethod === 'cod' ? 'pending' : 'paid',
+            payment_status: paymentStatus,
+            razorpay_order_id: paymentDetails?.razorpay_order_id,
+            razorpay_payment_id: paymentDetails?.razorpay_payment_id,
             estimated_delivery: newOrder.estimated_delivery,
           },
         ])

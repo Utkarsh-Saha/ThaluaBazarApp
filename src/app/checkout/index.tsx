@@ -32,6 +32,8 @@ import { triggerHaptic } from '../../lib/haptics';
 import { getDetailedAddressFromGPS } from '../../lib/location';
 import { fetchUserAddresses, formatAddressString } from '../../lib/addresses';
 import { UserAddress } from '../../types';
+import { createRazorpayOrder, verifyRazorpayPayment, PaymentOrderResponse } from '../../lib/payments';
+import { RazorpayCheckoutModal } from '../../components/RazorpayCheckoutModal';
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -48,6 +50,9 @@ export default function CheckoutScreen() {
   const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'cod' | 'netbanking'>('upi');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocatingAddress, setIsLocatingAddress] = useState(false);
+  const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
+  const [razorpayOrder, setRazorpayOrder] = useState<PaymentOrderResponse | null>(null);
+  const [pendingOrderNumber, setPendingOrderNumber] = useState<string>('');
 
   useEffect(() => {
     let isMounted = true;
@@ -109,6 +114,58 @@ export default function CheckoutScreen() {
     }
   };
 
+  const handlePaymentSuccess = async (response: {
+    razorpayOrderId: string;
+    razorpayPaymentId: string;
+    razorpaySignature: string;
+  }) => {
+    if (!user) return;
+    setIsSubmitting(true);
+    try {
+      // Verify payment signature cryptographically
+      await verifyRazorpayPayment({
+        razorpayOrderId: response.razorpayOrderId,
+        razorpayPaymentId: response.razorpayPaymentId,
+        razorpaySignature: response.razorpaySignature,
+      });
+
+      // Place order with payment status paid and Razorpay IDs
+      const order = await placeOrder(
+        cart,
+        user,
+        deliveryType,
+        address,
+        paymentMethod,
+        {
+          razorpay_order_id: response.razorpayOrderId,
+          razorpay_payment_id: response.razorpayPaymentId,
+          payment_status: 'paid',
+        }
+      );
+
+      setIsPaymentModalVisible(false);
+      clearCart();
+      router.replace({
+        pathname: '/checkout/confirmation',
+        params: {
+          orderId: order.id,
+          orderNumber: order.order_number,
+          total: order.total.toString(),
+          paymentStatus: 'paid',
+          paymentMethod,
+        },
+      });
+    } catch (err: any) {
+      console.error('Payment completion error:', err);
+      Alert.alert(
+        language === 'as' ? 'পৰিশোধ পৰীক্ষণ ব্যৰ্থ' : 'Payment Verification Failed',
+        err?.message || (language === 'as' ? 'পৰিশোধ পৰীক্ষা কৰাত সমস্যা হৈছে।' : 'Could not verify payment signature. Please contact support.')
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handlePlaceOrder = async () => {
     if (cart.length === 0) return;
 
@@ -139,27 +196,66 @@ export default function CheckoutScreen() {
       return;
     }
 
-    triggerHaptic('success');
+    // Cash On Delivery flow
+    if (paymentMethod === 'cod') {
+      triggerHaptic('success');
+      setIsSubmitting(true);
+      try {
+        const order = await placeOrder(
+          cart,
+          user,
+          deliveryType,
+          address,
+          'cod',
+          { payment_status: 'pending' }
+        );
+
+        clearCart();
+        router.replace({
+          pathname: '/checkout/confirmation',
+          params: {
+            orderId: order.id,
+            orderNumber: order.order_number,
+            total: order.total.toString(),
+            paymentStatus: 'pending',
+            paymentMethod: 'cod',
+          },
+        });
+      } catch (err: any) {
+        Alert.alert(
+          language === 'as' ? 'অৰ্ডাৰ ব্যৰ্থ' : 'Order Failed',
+          err?.message || (language === 'as' ? 'অৰ্ডাৰ স্থাপন কৰিব নোৱাৰিলে।' : 'Failed to place order. Please try again.')
+        );
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // Razorpay Online Payment Flow (UPI, Card, Netbanking)
+    const tempOrderNum = `#TB-${Math.floor(1000 + Math.random() * 9000)}`;
+    setPendingOrderNumber(tempOrderNum);
+    triggerHaptic('medium');
     setIsSubmitting(true);
-
     try {
-      const order = await placeOrder(
-        cart,
-        user,
-        deliveryType,
-        address,
-        paymentMethod
-      );
-
-      clearCart();
-      router.replace({
-        pathname: '/checkout/confirmation',
-        params: {
-          orderId: order.id,
-          orderNumber: order.order_number,
-          total: order.total.toString(),
-        },
+      const rzpOrder = await createRazorpayOrder({
+        orderNumber: tempOrderNum,
+        amount: total,
+        buyerId: user.id,
+        buyerName: user.name || 'Thaluwa Buyer',
+        buyerPhone: user.phone || '',
+        sellerId: cart[0]?.listing.seller_id || 's1',
+        itemsSummary: cart.map(i => `${i.quantity}x ${i.listing.title_en}`).join(', '),
       });
+
+      setRazorpayOrder(rzpOrder);
+      setIsPaymentModalVisible(true);
+    } catch (err: any) {
+      console.error('Razorpay order creation error:', err);
+      Alert.alert(
+        language === 'as' ? 'পৰিশোধ আৰম্ভ ব্যৰ্থ' : 'Payment Initialization Failed',
+        err?.message || (language === 'as' ? 'পৰিশোধ প্ৰক্ৰিয়া আৰম্ভ কৰিব নোৱাৰিলে।' : 'Unable to initiate Razorpay checkout. Please try again.')
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -495,6 +591,34 @@ export default function CheckoutScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Razorpay In-App Payment Modal */}
+      {razorpayOrder && (
+        <RazorpayCheckoutModal
+          visible={isPaymentModalVisible}
+          initialTab={paymentMethod === 'card' ? 'card' : paymentMethod === 'netbanking' ? 'netbanking' : 'upi'}
+          onClose={() => {
+            setIsPaymentModalVisible(false);
+            setIsSubmitting(false);
+          }}
+          orderNumber={pendingOrderNumber}
+          amount={total}
+          razorpayOrderId={razorpayOrder.razorpayOrderId}
+          isMock={razorpayOrder.isMock}
+          buyerName={user?.name}
+          buyerPhone={user?.phone}
+          sellerName={cart[0]?.listing.seller_name}
+          onSuccess={handlePaymentSuccess}
+          onFailure={(err) => {
+            setIsPaymentModalVisible(false);
+            setIsSubmitting(false);
+            Alert.alert(
+              language === 'as' ? 'পৰিশোধ বাতিল বা ব্যৰ্থ' : 'Payment Cancelled or Failed',
+              err || (language === 'as' ? 'অনুগ্ৰহ কৰি পুনৰ চেষ্টা কৰক বা নগদ পৰিশোধ বাছক।' : 'Payment could not be completed. You can try again or select Cash on Delivery.')
+            );
+          }}
+        />
+      )}
     </View>
   );
 }

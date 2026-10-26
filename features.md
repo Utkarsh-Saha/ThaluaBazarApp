@@ -22,7 +22,7 @@ Thaluwa Bazar is a hyperlocal rural-to-urban commerce and producer empowerment p
 
 | Module | Feature | Current State | Target Priority | Technical Debt / Remaining Work |
 | :--- | :--- | :---: | :---: | :--- |
-| **Payments** | UPI Intent & Payment Gateway | ⚠️ Mock / UI Only | **P0** | No live Razorpay/Cashfree/UPI deep-link; orders bypass payment capture. |
+| **Payments** | Razorpay Gateway & UPI Intent | ✅ Complete | **P0** | Standard Razorpay REST order generation, in-app checkout modal (UPI, Cards, Netbanking), HMAC-SHA256 signature verification, and transaction ledger. |
 | **Communication**| Buyer-Seller Direct Messaging | ✅ Complete | **P1** | In-app direct chat, 30s voice notes via `expo-audio`, Realtime WebSocket, WhatsApp quick-orders. |
 | **Buyer Profile** | Cloud Address Book | ✅ Complete | **P1** | Multi-address cloud persistence via `user_addresses`, local offline fallback, and checkout chips. |
 | **Search** | Filter Engine (Organic/In-Stock/Sort) | ✅ Complete | **P1** | Bottom-sheet modal with organic certification, stock availability, max price, and 5 sort criteria. |
@@ -33,21 +33,13 @@ Thaluwa Bazar is a hyperlocal rural-to-urban commerce and producer empowerment p
 
 ---
 
-## 3. P0: Critical Missing Links & Stubs (Immediate Next Steps)
+## 3. P1: High-Impact Core Enhancements (Remaining Roadmap)
 
-### 3.1 Real Payment Gateway & UPI Deep-Link Integration
-* **Current State:** In `src/app/checkout/index.tsx`, choosing 'UPI', 'Card', or 'Netbanking' places the order immediately in the database with status `REQUESTED` without verifying payment capture.
-* **Remaining Work:**
-  1. **UPI Intent Deep-Linking (`upi://pay`)**:
-     - Integrate zero-fee UPI deep links for Indian banking apps (Google Pay, PhonePe, Paytm, BHIM).
-     - Format: `upi://pay?pa={SELLER_UPI}&pn={BUSINESS_NAME}&am={AMOUNT}&tr={ORDER_NO}&tn=ThaluwaBazarOrder`
-  2. **Payment Gateway SDK**:
-     - Integrate Razorpay (`react-native-razorpay`) or Cashfree React Native SDK for card, netbanking, and verified UPI webhooks.
-     - Add webhook handler in `backend/src/controllers/ordersController.ts` to update `payment_status` from `pending` to `paid` upon verified signature.
-
----
-
-## 4. P1: High-Impact Core Enhancements
+### 3.1 B2B Bulk & Wholesale Produce Tier
+* **Context:** Local restaurants, hostel messes, grocery retailers, and catering businesses in Assam frequently purchase rice, ginger, turmeric, mustard oil, and vegetables in bulk quantities (quintals/sacks).
+* **Enhancement:**
+  - Support volume-tiered pricing in `listings` (e.g., standard price ₹60/kg, 20kg+ wholesale price ₹45/kg).
+  - Add "Request Bulk Quote" button allowing business buyers to send RFQs to producer SHGs.
 
 ---
 

@@ -10,12 +10,16 @@ import { triggerHaptic } from '../../lib/haptics';
 export default function OrderConfirmationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { orderId, orderNumber, total } = useLocalSearchParams<{
+  const { orderId, orderNumber, total, paymentStatus, paymentMethod } = useLocalSearchParams<{
     orderId: string;
     orderNumber: string;
     total: string;
+    paymentStatus?: string;
+    paymentMethod?: string;
   }>();
   const { language, t } = useLanguage();
+
+  const isPaid = paymentStatus === 'paid';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 30, paddingBottom: insets.bottom + 20 }]}>
@@ -39,6 +43,32 @@ export default function OrderConfirmationScreen() {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>{t('total')}</Text>
             <Text style={styles.detailTotalValue}>₹{total || '390'}</Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>
+              {language === 'as' ? 'পৰিশোধ স্থিতি' : 'Payment Status'}
+            </Text>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: isPaid ? '#ECFDF5' : '#FFFBEB',
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 6,
+              borderWidth: 1,
+              borderColor: isPaid ? '#A7F3D0' : '#FDE68A',
+            }}>
+              <Text style={{
+                fontSize: 12,
+                fontWeight: '700',
+                color: isPaid ? '#047857' : '#B45309',
+              }}>
+                {isPaid
+                  ? (language === 'as' ? 'অনলাইন পৰিশোধ সম্পন্ন (Razorpay)' : 'Paid Online (Razorpay Verified)')
+                  : (language === 'as' ? 'নগদ পৰিশোধ (বাকী)' : 'Cash on Delivery (Pending)')}
+              </Text>
+            </View>
           </View>
 
           <View style={styles.detailRow}>

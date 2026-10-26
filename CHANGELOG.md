@@ -9,6 +9,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased] - 2026-10-26
 
+### Feat: Razorpay Payment Gateway & Instant UPI Checkout (P0)
+
+#### Added
+- **Full-Stack Razorpay Integration (`backend/src/services/razorpayService.ts`, `src/lib/payments.ts`)**:
+  - **Secure REST Order Generation**: Server-side Razorpay order creation (`/api/v1/payments/create-order`) using Basic Authentication, INR to Paise conversion, and automatic receipt tagging.
+  - **Cryptographic Signature Verification**: Cryptographic HMAC-SHA256 signature verification (`/api/v1/payments/verify`) using `crypto.createHmac('sha256', secret).update(order_id + "|" + payment_id).digest('hex')`.
+  - **Dedicated Transaction Ledger**: Created `public.payment_transactions` PostgreSQL table with full audit trail, foreign keys to `orders`, transaction status tracking (`initiated`, `success`, `failed`, `refunded`), and raw gateway payload storage.
+  - **Realtime Order Updates & Push Alerts**: Auto-marks orders as `payment_status: 'paid'`, increments seller settlement ledger, and triggers real-time push notifications to both buyer and seller upon payment capture.
+- **In-App Payment Checkout Modal (`src/components/RazorpayCheckoutModal.tsx`)**:
+  - **Interactive Multi-Rail Checkout**: Rich modal supporting Instant UPI (Google Pay, PhonePe, Paytm, BHIM deep-linking and VPA handle verification), Credit/Debit Cards with live validation and PCI-DSS 256-bit encryption indicators, and Assam & National Netbanking (SBI, Assam Gramin Vikash Bank, HDFC, ICICI, PNB).
+  - **Zero-Friction Sandbox Fallback**: Built-in test sandbox simulation allowing end-to-end payment testing even prior to entering production API keys.
+  - **Checkout Screen Integration (`src/app/checkout/index.tsx`)**: Integrated into buyer checkout flow, capturing online transactions prior to order confirmation while preserving direct Cash On Delivery (COD).
+  - **Transparent Payment Status Tracking**: Added verified online payment tags to [confirmation.tsx](file:///U:/SHGC/src/app/checkout/confirmation.tsx), Buyer Order Tracking ([orders.tsx](file:///U:/SHGC/src/app/(tabs)/orders.tsx)), and Seller Order Management ([seller/orders.tsx](file:///U:/SHGC/src/app/seller/orders.tsx)).
+
 ### Feat: Admin Operations Console, Real-Time Audit Trail & Analytics
 
 #### Added

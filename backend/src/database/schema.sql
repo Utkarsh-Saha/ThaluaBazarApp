@@ -641,3 +641,40 @@ drop policy if exists "Allow public read chat audio" on storage.objects;
 drop policy if exists "Allow upload chat audio" on storage.objects;
 create policy "Allow public read chat audio" on storage.objects for select using (bucket_id = 'chat-audio');
 create policy "Allow upload chat audio" on storage.objects for insert with check (bucket_id = 'chat-audio');
+
+-- 15. PAYMENT TRANSACTIONS TABLE
+create table if not exists public.payment_transactions (
+  id uuid default uuid_generate_v4() primary key,
+  order_id uuid references public.orders(id) on delete cascade,
+  order_number text not null,
+  buyer_id text not null,
+  seller_id text not null,
+  amount numeric(10,2) not null,
+  currency text default 'INR',
+  payment_method text not null, -- 'razorpay', 'upi_intent', 'cod'
+  payment_status text not null default 'initiated', -- 'initiated', 'success', 'failed', 'refunded'
+  razorpay_order_id text,
+  razorpay_payment_id text,
+  razorpay_signature text,
+  error_code text,
+  error_description text,
+  raw_response jsonb default '{}'::jsonb,
+  created_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+alter table if exists public.orders add column if not exists razorpay_order_id text;
+alter table if exists public.orders add column if not exists razorpay_payment_id text;
+
+create index if not exists idx_payment_transactions_order on public.payment_transactions (order_id);
+create index if not exists idx_payment_transactions_rzp_order on public.payment_transactions (razorpay_order_id);
+create index if not exists idx_payment_transactions_rzp_payment on public.payment_transactions (razorpay_payment_id);
+
+alter table public.payment_transactions enable row level security;
+
+drop policy if exists "Allow read payment_transactions" on public.payment_transactions;
+drop policy if exists "Allow insert payment_transactions" on public.payment_transactions;
+drop policy if exists "Allow update payment_transactions" on public.payment_transactions;
+create policy "Allow read payment_transactions" on public.payment_transactions for select using (true);
+create policy "Allow insert payment_transactions" on public.payment_transactions for insert with check (true);
+create policy "Allow update payment_transactions" on public.payment_transactions for update using (true);
+

@@ -1,14 +1,6 @@
 # Thaluwa Bazar — Feature Audit & Remaining Work Summary
 
-### 1. Critical Missing Links & Stubs (P0 Priority)
-
-1. **Real Payment Gateway & UPI Deep-Link Integration:**
-   - **Current State:** `src/app/checkout/index.tsx` accepts UPI, Card, or Netbanking selections, but immediately generates a database order without initiating a UPI intent (`upi://pay`) or capturing gateway payment tokens.
-   - **Remaining:** Integrate native UPI deep-linking (`upi://pay?pa=...`) and Razorpay / Cashfree SDK with backend webhook payment verification.
-
----
-
-### 2. High-Impact Core Enhancements (P1 Priority)
+### 1. High-Impact Core Enhancements (P1 Priority)
 
 - **B2B Bulk / Wholesale Produce Requests:** Volume-tiered pricing (e.g., 1–5 kg vs >20 kg) and "Request Bulk Quote" for local restaurants, caterers, and grocery stores.
 

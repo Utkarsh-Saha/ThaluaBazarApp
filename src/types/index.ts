@@ -143,6 +143,8 @@ export interface Order {
   delivery_address?: string;
   payment_method: 'upi' | 'card' | 'cod' | 'netbanking';
   payment_status: 'pending' | 'paid' | 'failed';
+  razorpay_order_id?: string;
+  razorpay_payment_id?: string;
   created_at: string;
   estimated_delivery?: string;
 }
