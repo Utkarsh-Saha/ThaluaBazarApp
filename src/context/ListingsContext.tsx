@@ -101,7 +101,7 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Dynamic User GPS Location State
   const [userCoords, setUserCoords] = useState<UserCoords>(DEFAULT_COORDS);
   const [isDetectingLocation, setIsDetectingLocation] = useState<boolean>(false);
-  const [isOffline, setIsOffline] = useState<boolean>(!offlineSyncManager.isOnline);
+  const [isOffline, setIsOffline] = useState<boolean>(offlineSyncManager.isEffectivelyOffline);
 
   // Initialize cached location on mount
   useEffect(() => {
@@ -223,9 +223,10 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
 
     // 2. Subscribe to network status
-    const unsubNet = offlineSyncManager.subscribeToNetwork((online) => {
-      setIsOffline(!online);
-      if (online) {
+    const unsubNet = offlineSyncManager.subscribeToNetwork((state) => {
+      const effectivelyOffline = state.isManualOffline || !state.isOnline;
+      setIsOffline(effectivelyOffline);
+      if (state.isOnline && !state.isManualOffline) {
         fetchLiveListings();
         fetchLiveCategories();
       }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import {
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useLanguage } from '../context/LanguageContext';
 import { triggerHaptic } from '../lib/haptics';
+import { offlineSyncManager } from '../lib/offlineSync';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -33,6 +34,20 @@ export default function SettingsScreen() {
   const [orderNotifs, setOrderNotifs] = useState(true);
   const [lowDataMode, setLowDataMode] = useState(false);
   const [soundHaptics, setSoundHaptics] = useState(true);
+  const [manualOffline, setManualOffline] = useState(offlineSyncManager.isManualOffline);
+
+  useEffect(() => {
+    const unsub = offlineSyncManager.subscribeToNetwork((state) => {
+      setManualOffline(state.isManualOffline);
+    });
+    return unsub;
+  }, []);
+
+  const handleToggleManualOffline = async (enabled: boolean) => {
+    triggerHaptic('medium');
+    setManualOffline(enabled);
+    await offlineSyncManager.setManualOfflineMode(enabled);
+  };
 
   const handleClearCache = () => {
     Alert.alert(
@@ -163,6 +178,26 @@ export default function SettingsScreen() {
               {language === 'as' ? 'ইণ্টাৰনেট আৰু ডেটা' : 'Data & Performance'}
             </Text>
           </View>
+
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleTextContainer}>
+              <Text style={styles.toggleTitle}>
+                {language === 'as' ? 'অফলাইন মোড (Manual Offline)' : 'Force Offline Mode'}
+              </Text>
+              <Text style={styles.toggleSubtitle}>
+                {language === 'as'
+                  ? 'কেৱল সংৰক্ষিত স্থানীয় কেচ ব্যৱহাৰ কৰিবলৈ অন কৰক'
+                  : 'Turn on to browse locally cached produce without internet'}
+              </Text>
+            </View>
+            <Switch
+              value={manualOffline}
+              onValueChange={handleToggleManualOffline}
+              trackColor={{ false: COLORS.border, true: COLORS.primary }}
+            />
+          </View>
+
+          <View style={styles.divider} />
 
           <View style={styles.toggleRow}>
             <View style={styles.toggleTextContainer}>

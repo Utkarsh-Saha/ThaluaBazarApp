@@ -5,6 +5,7 @@ const SYNC_QUEUE_KEY = '@thaluwa_sync_queue';
 const CACHED_LISTINGS_KEY = '@thaluwa_cached_listings';
 const CACHED_CATEGORIES_KEY = '@thaluwa_cached_categories';
 const CACHED_ORDERS_KEY = '@thaluwa_cached_orders';
+const MANUAL_OFFLINE_KEY = '@thaluwa_manual_offline_mode';
 
 export type SyncActionType = 'CREATE_ORDER' | 'TOGGLE_WISHLIST' | 'SAVE_ADDRESS';
 
@@ -16,18 +17,42 @@ export interface SyncAction {
   attempts: number;
 }
 
-type NetworkListener = (isOnline: boolean) => void;
+export type SignalQuality = 'good' | 'low' | 'offline';
+
+export interface NetworkState {
+  isOnline: boolean;
+  signalQuality: SignalQuality;
+  isManualOffline: boolean;
+}
+
+type NetworkListener = (state: NetworkState) => void;
 type QueueListener = (pendingCount: number) => void;
 
 class OfflineSyncManager {
   private isOnlineStatus: boolean = true;
+  private signalQualityStatus: SignalQuality = 'good';
+  private isManualOfflineStatus: boolean = false;
+  private consecutiveFailures: number = 0;
   private networkListeners: Set<NetworkListener> = new Set();
   private queueListeners: Set<QueueListener> = new Set();
   private checkInterval: any = null;
   private isProcessing: boolean = false;
 
   constructor() {
+    this.initManualMode();
     this.initNetworkMonitoring();
+  }
+
+  private async initManualMode() {
+    try {
+      const saved = await AsyncStorage.getItem(MANUAL_OFFLINE_KEY);
+      if (saved !== null) {
+        this.isManualOfflineStatus = JSON.parse(saved);
+        this.notifyNetworkListeners();
+      }
+    } catch {
+      // Default to false (online)
+    }
   }
 
   /**
@@ -35,51 +60,133 @@ class OfflineSyncManager {
    */
   private initNetworkMonitoring() {
     this.checkConnectivity();
-    // Poll connectivity every 8 seconds
+    // Poll connectivity every 15 seconds
     this.checkInterval = setInterval(() => {
       this.checkConnectivity();
-    }, 8000);
+    }, 15000);
   }
 
   public async checkConnectivity(): Promise<boolean> {
-    try {
-      // Fast DNS / Head ping to Supabase or Cloudflare
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const startTime = Date.now();
+    let probeOk = false;
 
-      const res = await fetch('https://www.cloudflare.com/cdn-cgi/trace', {
-        method: 'HEAD',
+    // Primary: Google 204 endpoint (fastest, standard Android/Chrome connectivity test)
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2800);
+
+      const res = await fetch('https://clients3.google.com/generate_204', {
+        method: 'GET',
         signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
-      const online = res.ok;
-      this.setOnlineStatus(online);
-      return online;
+      if (res.status === 204 || res.ok) {
+        probeOk = true;
+      }
     } catch {
-      this.setOnlineStatus(false);
-      return false;
+      // Secondary fallback: 1.1.1.1 trace endpoint
+      try {
+        const controller2 = new AbortController();
+        const timeoutId2 = setTimeout(() => controller2.abort(), 2200);
+
+        const res2 = await fetch('https://1.1.1.1/cdn-cgi/trace', {
+          method: 'GET',
+          signal: controller2.signal,
+        });
+
+        clearTimeout(timeoutId2);
+        if (res2.ok) {
+          probeOk = true;
+        }
+      } catch {
+        probeOk = false;
+      }
+    }
+
+    const latency = Date.now() - startTime;
+
+    if (probeOk) {
+      this.consecutiveFailures = 0;
+      // If latency is high (>2500ms), categorize as low signal
+      const quality: SignalQuality = latency > 2500 ? 'low' : 'good';
+      this.updateConnectionState(true, quality);
+      return true;
+    } else {
+      this.consecutiveFailures += 1;
+      // Only declare fully offline after 2 consecutive probe failures
+      if (this.consecutiveFailures >= 2) {
+        this.updateConnectionState(false, 'offline');
+        return false;
+      } else {
+        // First transient hiccup: classify as low signal rather than kicking immediately into full offline
+        this.updateConnectionState(true, 'low');
+        return true;
+      }
     }
   }
 
-  private setOnlineStatus(newStatus: boolean) {
-    if (this.isOnlineStatus !== newStatus) {
-      this.isOnlineStatus = newStatus;
-      this.networkListeners.forEach((fn) => fn(newStatus));
-      if (newStatus) {
+  private updateConnectionState(online: boolean, quality: SignalQuality) {
+    const statusChanged = this.isOnlineStatus !== online || this.signalQualityStatus !== quality;
+    if (statusChanged) {
+      const wasOffline = !this.isOnlineStatus;
+      this.isOnlineStatus = online;
+      this.signalQualityStatus = quality;
+      this.notifyNetworkListeners();
+
+      if (wasOffline && online && !this.isManualOfflineStatus) {
         // Automatically flush queue when internet connectivity is restored
         this.processSyncQueue();
       }
     }
   }
 
+  public async setManualOfflineMode(enabled: boolean): Promise<void> {
+    this.isManualOfflineStatus = enabled;
+    try {
+      await AsyncStorage.setItem(MANUAL_OFFLINE_KEY, JSON.stringify(enabled));
+    } catch (e) {
+      console.warn('[OfflineSync] Failed to persist manual offline mode', e);
+    }
+    this.notifyNetworkListeners();
+
+    if (!enabled && this.isOnlineStatus) {
+      this.processSyncQueue();
+    }
+  }
+
+  public get isManualOffline(): boolean {
+    return this.isManualOfflineStatus;
+  }
+
   public get isOnline(): boolean {
     return this.isOnlineStatus;
   }
 
+  public get signalQuality(): SignalQuality {
+    return this.signalQualityStatus;
+  }
+
+  public get isEffectivelyOffline(): boolean {
+    return this.isManualOfflineStatus || !this.isOnlineStatus;
+  }
+
+  public get networkState(): NetworkState {
+    return {
+      isOnline: this.isOnlineStatus,
+      signalQuality: this.signalQualityStatus,
+      isManualOffline: this.isManualOfflineStatus,
+    };
+  }
+
+  private notifyNetworkListeners() {
+    const state = this.networkState;
+    this.networkListeners.forEach((fn) => fn(state));
+  }
+
   public subscribeToNetwork(listener: NetworkListener): () => void {
     this.networkListeners.add(listener);
-    listener(this.isOnlineStatus);
+    listener(this.networkState);
     return () => {
       this.networkListeners.delete(listener);
     };
