@@ -26,7 +26,7 @@ Thaluwa Bazar is a hyperlocal rural-to-urban commerce and producer empowerment p
 | **Communication**| Buyer-Seller Direct Messaging | ✅ Complete | **P1** | In-app direct chat, 30s voice notes via `expo-audio`, Realtime WebSocket, WhatsApp quick-orders. |
 | **Buyer Profile** | Cloud Address Book | ✅ Complete | **P1** | Multi-address cloud persistence via `user_addresses`, local offline fallback, and checkout chips. |
 | **Search** | Filter Engine (Organic/In-Stock/Sort) | ✅ Complete | **P1** | Bottom-sheet modal with organic certification, stock availability, max price, and 5 sort criteria. |
-| **Accessibility**| Assamese Voice Search | ✅ Complete | **P2** | In-app voice recognition via `expo-audio`, animated audio wave, phonetic Assamese commodity dictionary, and backend route. |
+| **Accessibility**| Native Keyboard Voice Input | ✅ Complete | **P2** | Native Google Keyboard (Gboard) / iOS voice dictation with direct search bar focus and real-time filtering. |
 | **Resilience** | Offline Caching & Sync | ✅ Complete | **P2** | Local AsyncStorage catalog hydration, heartbeat network detection, pending sync queue, and `OfflineBanner`. |
 | **B2B / Commerce**| Wholesale & Bulk Orders | ❌ Backlog | **P1** | No volume tiers or Request For Quote (RFQ) for grocers and restaurants. |
 | **Delivery** | Village Courier / Delivery Boy Role | ❌ Backlog | **P2** | Platform lacks third-party dispatch role; relies solely on self-pickup or producer delivery. |

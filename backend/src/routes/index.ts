@@ -8,7 +8,6 @@ import categoriesRoutes from './categoriesRoutes.js';
 import reviewsRoutes from './reviewsRoutes.js';
 import notificationsRoutes from './notificationsRoutes.js';
 import paymentsRoutes from './paymentsRoutes.js';
-import voiceRoutes from './voiceRoutes.js';
 
 const apiRouter = Router();
 
@@ -29,6 +28,5 @@ apiRouter.use('/categories', categoriesRoutes);
 apiRouter.use('/reviews', reviewsRoutes);
 apiRouter.use('/notifications', notificationsRoutes);
 apiRouter.use('/payments', paymentsRoutes);
-apiRouter.use('/voice', voiceRoutes);
 
 export default apiRouter;

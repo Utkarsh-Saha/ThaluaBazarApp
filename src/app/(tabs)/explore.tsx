@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,6 @@ import { CategoryPills } from '../../components/CategoryPills';
 import { ProductCard } from '../../components/ProductCard';
 import { FilterModal } from '../../components/FilterModal';
 import { OfflineBanner } from '../../components/OfflineBanner';
-import { AssameseVoiceSearchModal } from '../../components/AssameseVoiceSearchModal';
 import { COLORS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
 import { useListings } from '../../context/ListingsContext';
@@ -41,7 +40,7 @@ export default function ExploreScreen() {
   } = useListings();
 
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const searchInputRef = useRef<any>(null);
 
   return (
     <View style={styles.container}>
@@ -76,11 +75,17 @@ export default function ExploreScreen() {
               <View style={styles.searchContainer}>
                 <Search size={18} color={COLORS.textSecondary} />
                 <TextInput
+                  ref={searchInputRef}
                   style={styles.searchInput}
-                  placeholder={language === 'as' ? 'সামগ্ৰী বিচাৰক বা কথা কওক...' : 'Search produce or tap mic...'}
+                  placeholder={
+                    language === 'as'
+                      ? 'সামগ্ৰী বিচাৰক (বা কিবৰ্ডৰ 🎤 টিপক)...'
+                      : 'Search produce (or tap 🎤 on keyboard)...'
+                  }
                   placeholderTextColor={COLORS.textMuted}
                   value={searchQuery}
                   onChangeText={setSearchQuery}
+                  returnKeyType="search"
                 />
                 {searchQuery.length > 0 && (
                   <TouchableOpacity
@@ -97,7 +102,7 @@ export default function ExploreScreen() {
                   style={styles.voiceMicBtn}
                   onPress={() => {
                     triggerHaptic('medium');
-                    setShowVoiceModal(true);
+                    searchInputRef.current?.focus();
                   }}
                   activeOpacity={0.8}
                 >
@@ -264,14 +269,6 @@ export default function ExploreScreen() {
       <FilterModal
         visible={showFilterModal}
         onClose={() => setShowFilterModal(false)}
-      />
-
-      <AssameseVoiceSearchModal
-        visible={showVoiceModal}
-        onClose={() => setShowVoiceModal(false)}
-        onSelectQuery={(query) => {
-          setSearchQuery(query);
-        }}
       />
     </View>
   );
