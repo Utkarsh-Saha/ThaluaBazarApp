@@ -7,6 +7,7 @@ import {
   FlatList,
   ScrollView,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { Search, Sparkles, MapPin, SlidersHorizontal, X, Mic } from 'lucide-react-native';
 import { Header } from '../../components/Header';
@@ -15,6 +16,7 @@ import { CategoryPills } from '../../components/CategoryPills';
 import { ProductCard } from '../../components/ProductCard';
 import { FilterModal } from '../../components/FilterModal';
 import { OfflineBanner } from '../../components/OfflineBanner';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { COLORS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
 import { useListings } from '../../context/ListingsContext';
@@ -41,6 +43,62 @@ export default function ExploreScreen() {
 
   const [showFilterModal, setShowFilterModal] = useState(false);
   const searchInputRef = useRef<any>(null);
+
+  const handleLaunchGoogleVoice = async () => {
+    triggerHaptic('medium');
+
+    if (Platform.OS === 'android') {
+      try {
+        const result = await IntentLauncher.startActivityAsync(
+          'android.speech.action.RECOGNIZE_SPEECH',
+          {
+            extra: {
+              'android.speech.extra.LANGUAGE_MODEL': 'free_form',
+              'android.speech.extra.PROMPT':
+                language === 'as'
+                  ? 'থলুৱা সামগ্ৰী কওক (যেনে: জহা চাউল, কাজি নেমু)...'
+                  : 'Speak produce name (e.g. Joha Rice, Kaji Nemu)...',
+              'android.speech.extra.MAX_RESULTS': 1,
+            },
+          }
+        );
+
+        if (result && (result.resultCode === -1 || result.resultCode === 1)) {
+          const extras = ((result as any).extra || (result as any).extras) as any;
+          if (extras) {
+            const list = extras['android.speech.extra.RESULTS'] || extras['results'];
+            const text = Array.isArray(list) ? list[0] : list;
+            if (text && typeof text === 'string') {
+              setSearchQuery(text.trim());
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Explore] Google voice intent error:', err);
+      }
+    } else if (Platform.OS === 'web') {
+      if (
+        typeof window !== 'undefined' &&
+        (('SpeechRecognition' in window) || ('webkitSpeechRecognition' in window))
+      ) {
+        try {
+          const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+          const rec = new SpeechRec();
+          rec.lang = 'bn-IN';
+          rec.onresult = (e: any) => {
+            const text = e.results[0][0].transcript;
+            if (text) setSearchQuery(text);
+          };
+          rec.start();
+          return;
+        } catch {}
+      }
+    }
+
+    // Fallback: focus input
+    searchInputRef.current?.focus();
+  };
 
   return (
     <View style={styles.container}>
@@ -100,10 +158,7 @@ export default function ExploreScreen() {
                 )}
                 <TouchableOpacity
                   style={styles.voiceMicBtn}
-                  onPress={() => {
-                    triggerHaptic('medium');
-                    searchInputRef.current?.focus();
-                  }}
+                  onPress={handleLaunchGoogleVoice}
                   activeOpacity={0.8}
                 >
                   <Mic size={17} color={COLORS.primary} />
