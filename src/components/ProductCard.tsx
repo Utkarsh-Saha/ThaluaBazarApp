@@ -40,7 +40,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({ listing, layout = 'gri
       activeOpacity={0.88}
     >
       <View style={styles.imageContainer}>
-        <Image source={{ uri: listing.image_url }} style={styles.image} resizeMode="cover" />
+        <Image
+          source={{
+            uri:
+              listing.image_url && listing.image_url.trim().length > 0
+                ? listing.image_url
+                : 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400',
+          }}
+          style={styles.image}
+          resizeMode="cover"
+        />
         
         {listing.is_organic && (
           <View style={styles.badgeOrganic}>

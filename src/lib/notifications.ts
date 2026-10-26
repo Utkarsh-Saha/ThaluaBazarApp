@@ -8,7 +8,6 @@ import { supabase } from './supabase';
 // Configure foreground notification banner behavior
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
     shouldShowBanner: true,

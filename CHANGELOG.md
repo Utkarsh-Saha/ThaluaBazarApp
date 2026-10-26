@@ -37,10 +37,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Connected Supabase `seller_payouts` table to backend `sellerRoutes.ts` (`GET /api/seller/:id/payouts`, `POST /api/seller/payout`).
   - Added real UTR generation and disbursement tracking in `adminController.ts`.
   - Added real-time settlement balance, Supabase updates, and withdrawal modal in `src/app/seller/earnings.tsx`.
+- **Native Device GPS & Assam Reverse Geocoding (`src/lib/location.ts`)**:
+  - Integrated live GPS auto-detection via `expo-location` paired with automatic reverse geocoding to resolve the buyer's exact village, locality, and Assam district.
+  - Indexed all 35 administrative districts of Assam (`ASSAM_DISTRICTS`) and their geographic centroids (`ASSAM_DISTRICT_CENTROIDS`) for fast proximity resolution and offline fallback.
+  - Added local coordinate persistence via `AsyncStorage` (`@thaluwa_user_coords`) so user locality remains cached across app sessions.
+  - Upgraded `Header.tsx` with live location display and an interactive Assam District & GPS detection modal.
+  - Wired live distance calculation into `ListingsContext.tsx`, dynamically sorting listings by nearest first and computing accurate kilometers from the user's physical coordinates.
+  - Integrated real distance badges (`X.X km away`) into `ProductCard.tsx` and product detail view (`src/app/product/[id].tsx`).
+  - Added one-tap GPS auto-fill in user registration (`src/app/(auth)/register.tsx`), delivery address book (`src/app/addresses.tsx`), checkout delivery address (`src/app/checkout/index.tsx`), and producer registration (`src/app/seller/register.tsx`).
+- **Multi-Address Cloud Persistence & Address Book (`src/lib/addresses.ts`, `src/app/addresses.tsx`, `src/app/checkout/index.tsx`, `backend/src/database/schema.sql`)**:
+  - **Schema & Persistence Engine**: Added `public.user_addresses` schema definition with UUID primary keys, user references, geocoordinates, address labels (`home`, `work`, `farm`), and default selection flags.
+  - **Offline-First Multi-Address Manager (`src/lib/addresses.ts`)**: Built cached storage using `AsyncStorage` (`@thaluwa_user_addresses_*`) paired with automatic Supabase sync, automatic primary address seeding from user profile, and mutual exclusion for default addresses.
+  - **Delivery Addresses Management (`src/app/addresses.tsx`)**: Upgraded to support live asynchronous saving, deletion, and default selection with reactive UI updates.
+  - **Checkout Address Picker (`src/app/checkout/index.tsx`)**: Added interactive horizontal address selector chips (`🏠 Home`, `🌱 Farm`, `💼 Work`, `+ Manage`) that automatically select the user's default address and populate the checkout order with full details.
+- **Advanced Produce Catalog Filters & Sorting (`src/components/FilterModal.tsx`, `src/app/(tabs)/explore.tsx`, `src/context/ListingsContext.tsx`)**:
+  - **Context-Level Filter Engine (`src/context/ListingsContext.tsx`)**: Added `FilterOptions` state supporting `organicOnly` certification, `inStockOnly` availability, `maxPrice` thresholds, and dynamic sorting by Distance (Nearest First), Price (Low to High), Price (High to Low), Rating (Highest First), and Fresh Harvest (Newest First).
+  - **Filter & Sort Modal (`src/components/FilterModal.tsx`)**: Built a bilingual bottom sheet modal with smooth animation, haptic feedback, preset price chips (Under ₹50, ₹100, ₹250, ₹500), toggle switches for Organic and In-Stock, and a live items-found preview CTA.
+- **In-App Direct Chat & Audio Voice Notes (`src/lib/chat.ts`, `src/app/chat/[id].tsx`, `src/app/messages/index.tsx`, `src/components/AudioVoicePlayer.tsx`, `backend/src/database/schema.sql`)**:
+  - **Conversations & Messages Schema**: Added `conversations` and `messages` tables supporting text messages, voice note audio recordings (`audio_url`, `audio_duration_seconds`), and produce inquiry context (`listing_id`, `listing_title`). Configured storage bucket `'chat-audio'` and public RLS access policies.
+  - **Offline-First Chat Persistence**: Implemented `src/lib/chat.ts` with local `AsyncStorage` caching (`@thaluwa_chat_conversations_*`, `@thaluwa_chat_messages_*`), bidirectional Supabase sync, and Supabase Realtime channel WebSocket subscriptions for zero-latency messaging.
+  - **Native Audio Recording & Playback (`expo-audio`)**: Integrated Expo SDK 58 `expo-audio` module (`useAudioRecorder`, `useAudioPlayer`, `useAudioRecorderState`, `RecordingPresets.HIGH_QUALITY`) with microphone permissions, duration timer up to 30 seconds, and custom waveform visualizer with play/pause playback controls (`AudioVoicePlayer.tsx`).
+  - **Direct Conversation Screen (`src/app/chat/[id].tsx`)**: Built complete direct chat interface featuring audio voice note recording, message bubbles with timestamps and read checks, produce inquiry header with direct deep-link, and bilingual quick inquiry prompts (*"🌱 When was this harvested?"*, *"⚡ Can I get delivery today?"*, *"📜 Is this 100% organic?"*).
+  - **WhatsApp Quick-Order Generator**: Added one-tap automated WhatsApp message generator formatting polite, bilingual order details and produce context for rural farmers and SHGs who check WhatsApp regularly.
+  - **Cross-App Chat Access Points**: Integrated direct chat triggers into product details (`src/components/MaskedContactButton.tsx`), buyer order cards (`src/app/(tabs)/orders.tsx`), seller fulfillment cards (`src/app/seller/orders.tsx`), top header bar (`src/components/Header.tsx`), and producer hub (`src/app/seller/dashboard.tsx`).
+
 
 #### Changed
-- **Seller Hub Producer Operations Layout (`src/app/seller/dashboard.tsx`)**:
-  - Converted producer operations section from vertical multi-row wrap to horizontal scrolling row (`horizontal`, `showsHorizontalScrollIndicator={false}`) with fixed 140px width cards and uniform layout across all device viewports.
+- **Seller Hub Producer Operations 2-Column Grid Layout (`src/app/seller/dashboard.tsx`)**:
+  - Replaced horizontal scroll list with a responsive 2-column multi-column flex grid (`operationsGrid`) dynamically sized via `useWindowDimensions()` (`cardWidth = Math.floor((screenWidth - 32 - 12) / 2)`).
+  - Expanded operations into an exact 4x2 symmetrical grid (8 cards: *Add Product*, *My Products*, *Orders*, *Earnings*, *Analytics*, *KYC Verification*, *Membership*, and *Documents & ID*).
+  - Standardized consistent cell heights (`minHeight: 118`), uniform internal paddings, rounded corners (`borderRadius: 16`), themed icon containers, and reactive status badges for pending orders (`${count} NEW`) and KYC verification (`✓`).
 
 #### Removed
 - **Haat Feature Platform-Wide Removal**:

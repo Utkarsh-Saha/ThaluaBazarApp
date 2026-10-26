@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
   Image,
 } from 'react-native';
-import { ShoppingBag, ChevronRight, PackageCheck, Clock, Star } from 'lucide-react-native';
+import { ShoppingBag, ChevronRight, PackageCheck, Clock, Star, MessageCircle } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Header } from '../../components/Header';
 import { OrderTrackingStepper } from '../../components/OrderTrackingStepper';
@@ -20,6 +21,7 @@ import { triggerHaptic } from '../../lib/haptics';
 import { supabase } from '../../lib/supabase';
 
 export default function OrdersScreen() {
+  const router = useRouter();
   const { language, t } = useLanguage();
   const { buyerOrders } = useOrders();
   const [activeFilter, setActiveFilter] = useState<'all' | 'ongoing' | 'completed'>('all');
@@ -223,33 +225,60 @@ export default function OrdersScreen() {
                 </View>
               )}
 
-              {/* Review & Feedback Section for Completed Orders */}
-              {item.status === 'COMPLETED' && (
-                <View style={styles.reviewActionRow}>
-                  {reviewedOrders[item.id] ? (
-                    <View style={styles.reviewedBadge}>
-                      <Star size={13} color="#D97706" fill="#F59E0B" />
-                      <Text style={styles.reviewedText}>
-                        {language === 'as' ? 'ৰেটিং দিয়া হ’ল' : 'Reviewed'} ({reviewedOrders[item.id].rating}★)
-                      </Text>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.rateBtn}
-                      onPress={() => {
-                        triggerHaptic('light');
-                        setReviewModalOrder(item);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <Star size={14} color="#D97706" fill="#F59E0B" />
-                      <Text style={styles.rateBtnText}>
-                        {language === 'as' ? 'ৰেটিং আৰু পৰ্যালোচনা দিয়ক' : 'Rate & Review Order'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
+              {/* Order Card Action Buttons */}
+              <View style={styles.orderCardActionsRow}>
+                <TouchableOpacity
+                  style={styles.chatProducerBtn}
+                  onPress={() => {
+                    triggerHaptic('light');
+                    router.push({
+                      pathname: `/chat/order-${item.id}`,
+                      params: {
+                        sellerId: item.seller_id,
+                        sellerName: item.seller_name,
+                        sellerPhone: item.seller_phone,
+                        buyerId: item.buyer_id,
+                        buyerName: item.buyer_name,
+                        listingTitle: item.items[0]?.title || `Order #${item.order_number}`,
+                      },
+                    });
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <MessageCircle size={14} color={COLORS.primary} />
+                  <Text style={styles.chatProducerBtnText}>
+                    {language === 'as' ? 'উৎপাদকৰ সৈতে চাট' : 'Chat / Voice Note'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Review & Feedback Section for Completed Orders */}
+                {item.status === 'COMPLETED' && (
+                  <View style={styles.reviewActionContainer}>
+                    {reviewedOrders[item.id] ? (
+                      <View style={styles.reviewedBadge}>
+                        <Star size={13} color="#D97706" fill="#F59E0B" />
+                        <Text style={styles.reviewedText}>
+                          {language === 'as' ? 'ৰেটিং দিয়া হ’ল' : 'Reviewed'} ({reviewedOrders[item.id].rating}★)
+                        </Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.rateBtn}
+                        onPress={() => {
+                          triggerHaptic('light');
+                          setReviewModalOrder(item);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Star size={14} color="#D97706" fill="#F59E0B" />
+                        <Text style={styles.rateBtnText}>
+                          {language === 'as' ? 'ৰেটিং দিয়ক' : 'Rate Order'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              </View>
             </View>
           );
         }}
@@ -447,13 +476,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 10,
   },
-  reviewActionRow: {
+  orderCardActionsRow: {
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderLight,
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  chatProducerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: COLORS.primaryLight,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+  },
+  chatProducerBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primaryDark,
+  },
+  reviewActionContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
   rateBtn: {

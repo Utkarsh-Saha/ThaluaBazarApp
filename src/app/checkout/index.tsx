@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   CheckCircle,
   Smartphone,
+  Navigation,
 } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
@@ -28,6 +29,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { useOrders } from '../../context/OrderContext';
 import { triggerHaptic } from '../../lib/haptics';
+import { getDetailedAddressFromGPS } from '../../lib/location';
+import { fetchUserAddresses, formatAddressString } from '../../lib/addresses';
+import { UserAddress } from '../../types';
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -39,8 +43,71 @@ export default function CheckoutScreen() {
   const { placeOrder } = useOrders();
 
   const [address, setAddress] = useState(user?.address || '');
+  const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'cod' | 'netbanking'>('upi');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLocatingAddress, setIsLocatingAddress] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function load() {
+      if (user) {
+        const list = await fetchUserAddresses(user);
+        if (isMounted) {
+          setSavedAddresses(list);
+          const def = list.find((a) => a.is_default) || list[0];
+          if (def && !address) {
+            setSelectedAddressId(def.id);
+            setAddress(formatAddressString(def));
+          } else if (def && address === user?.address) {
+            setSelectedAddressId(def.id);
+          }
+        }
+      }
+    }
+    load();
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  const handleAutoDetectGPSAddress = async () => {
+    triggerHaptic('medium');
+    setIsLocatingAddress(true);
+    setSelectedAddressId(null);
+    try {
+      const details = await getDetailedAddressFromGPS({ throwOnError: true });
+      setAddress(details.formattedAddress);
+      triggerHaptic('success');
+      Alert.alert(
+        language === 'as' ? 'ঠিকনা চিনাক্ত হৈছে 📍' : 'Address Auto-Detected 📍',
+        language === 'as'
+          ? `আপোনাৰ ঠিকনা GPS ৰ দ্বাৰা পূৰণ কৰা হৈছে:\n${details.formattedAddress}`
+          : `Delivery address populated from current GPS:\n${details.formattedAddress}\n\nYou can manually adjust it below.`
+      );
+    } catch (err: any) {
+      console.warn('GPS detection failed:', err);
+      triggerHaptic('error');
+      if (err?.message === 'PERMISSION_DENIED') {
+        Alert.alert(
+          language === 'as' ? 'অৱস্থানৰ অনুমতি প্ৰয়োজন' : 'Location Permission Required',
+          language === 'as'
+            ? 'স্বয়ংক্ৰিয় অৱস্থান চিনাক্তকৰণৰ বাবে GPS অনুমতি প্ৰদান কৰক বা হাতেৰে ঠিকনা লিখক।'
+            : 'Please grant location permission to auto-detect your delivery address, or type it manually below.'
+        );
+      } else {
+        Alert.alert(
+          language === 'as' ? 'GPS বিফল হৈছে' : 'GPS Auto-Detection Failed',
+          language === 'as'
+            ? 'GPS ৰ জৰিয়তে ঠিকনা লাভ কৰিব নোৱাৰিলে। অনুগ্ৰহ কৰি ঠিকনা নিজে লিখক।'
+            : 'Could not resolve current location via GPS. Please manually enter your address.'
+        );
+      }
+    } finally {
+      setIsLocatingAddress(false);
+    }
+  };
 
   const handlePlaceOrder = async () => {
     if (cart.length === 0) return;
@@ -131,14 +198,87 @@ export default function CheckoutScreen() {
               <MapPin size={16} color={COLORS.primary} />
               <Text style={styles.sectionTitle}>{t('deliveryAddress')}</Text>
             </View>
+
+            <TouchableOpacity
+              style={styles.gpsAutoFillBtn}
+              onPress={handleAutoDetectGPSAddress}
+              disabled={isLocatingAddress}
+              activeOpacity={0.8}
+            >
+              {isLocatingAddress ? (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              ) : (
+                <Navigation size={13} color={COLORS.primary} />
+              )}
+              <Text style={styles.gpsAutoFillBtnText}>
+                {isLocatingAddress
+                  ? (language === 'as' ? 'চিনাক্ত...' : 'Locating...')
+                  : (language === 'as' ? 'GPS ঠিকনা' : 'GPS Auto-fill')}
+              </Text>
+            </TouchableOpacity>
           </View>
+
+          {/* Saved Addresses Pills */}
+          {savedAddresses.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.savedAddressPillsContainer}
+            >
+              {savedAddresses.map((addr) => {
+                const isSelected = selectedAddressId === addr.id;
+                const formatted = formatAddressString(addr);
+                const icon = addr.type === 'farm' ? '🌱' : addr.type === 'work' ? '💼' : '🏠';
+                return (
+                  <TouchableOpacity
+                    key={addr.id}
+                    style={[
+                      styles.savedAddressPill,
+                      isSelected && styles.savedAddressPillActive,
+                    ]}
+                    onPress={() => {
+                      triggerHaptic('light');
+                      setSelectedAddressId(addr.id);
+                      setAddress(formatted);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.savedAddressPillText,
+                        isSelected && styles.savedAddressPillTextActive,
+                      ]}
+                    >
+                      {icon} {addr.name} ({addr.village || addr.district})
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+
+              <TouchableOpacity
+                style={styles.manageAddressesPill}
+                onPress={() => {
+                  triggerHaptic('light');
+                  router.push('/addresses');
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.manageAddressesPillText}>
+                  {language === 'as' ? '+ পৰিচালনা' : '+ Manage'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          )}
 
           <TextInput
             style={styles.addressInput}
             multiline
             numberOfLines={3}
             value={address}
-            onChangeText={setAddress}
+            onChangeText={(t) => {
+              setAddress(t);
+              setSelectedAddressId(null);
+            }}
             placeholder="Enter complete delivery address with PIN code"
             placeholderTextColor={COLORS.textMuted}
           />
@@ -414,6 +554,61 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: COLORS.text,
+  },
+  gpsAutoFillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: COLORS.primaryLight,
+  },
+  gpsAutoFillBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  savedAddressPillsContainer: {
+    gap: 8,
+    paddingVertical: 4,
+  },
+  savedAddressPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  savedAddressPillActive: {
+    backgroundColor: COLORS.primaryLight,
+    borderColor: COLORS.primary,
+  },
+  savedAddressPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  savedAddressPillTextActive: {
+    color: COLORS.primary,
+    fontWeight: '800',
+  },
+  manageAddressesPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: COLORS.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  manageAddressesPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
   },
   addressInput: {
     backgroundColor: COLORS.background,

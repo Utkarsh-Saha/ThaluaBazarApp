@@ -27,6 +27,23 @@ export interface User {
   created_at: string;
 }
 
+export interface UserAddress {
+  id: string;
+  user_id: string;
+  name: string;
+  phone: string;
+  type: 'home' | 'work' | 'farm';
+  street: string;
+  village: string;
+  district: string;
+  pincode: string;
+  landmark?: string;
+  is_default: boolean;
+  lat?: number;
+  lng?: number;
+  created_at?: string;
+}
+
 export interface SellerProfile {
   id: string;
   user_id: string;
@@ -148,3 +165,45 @@ export interface SellerPayout {
   reference_no?: string;
   created_at: string;
 }
+
+export type MessageType = 'text' | 'audio' | 'order_inquiry';
+
+export interface ChatMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  sender_name: string;
+  sender_role: 'buyer' | 'seller';
+  recipient_id: string;
+  message_type: MessageType;
+  text?: string;
+  audio_url?: string;
+  audio_duration_seconds?: number;
+  metadata?: {
+    listing_id?: string;
+    listing_title?: string;
+    listing_price?: number;
+    listing_image?: string;
+    order_id?: string;
+    order_number?: string;
+  };
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface Conversation {
+  id: string;
+  buyer_id: string;
+  buyer_name: string;
+  seller_id: string;
+  seller_name: string;
+  seller_phone?: string;
+  listing_id?: string;
+  listing_title?: string;
+  last_message_text?: string;
+  last_message_at: string;
+  buyer_unread_count: number;
+  seller_unread_count: number;
+  created_at: string;
+}
+

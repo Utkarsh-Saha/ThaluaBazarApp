@@ -22,6 +22,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useListings } from '../../context/ListingsContext';
 import { triggerHaptic } from '../../lib/haptics';
 import { uploadToSupabaseStorage } from '../../lib/storage';
+import { ASSAM_DISTRICT_CENTROIDS } from '../../lib/location';
 
 export default function AddProductScreen() {
   const router = useRouter();
@@ -95,8 +96,8 @@ export default function AddProductScreen() {
       unit,
       stock: parseInt(stock, 10) || 10,
       image_url: imageUrl,
-      lat: 26.435,
-      lng: 92.03,
+      lat: ASSAM_DISTRICT_CENTROIDS[sellerProfile?.district || 'Darrang']?.lat || 26.435,
+      lng: ASSAM_DISTRICT_CENTROIDS[sellerProfile?.district || 'Darrang']?.lng || 92.03,
       village: sellerProfile?.village || 'Deomornoi',
       district: sellerProfile?.district || 'Darrang',
       rating: 5.0,

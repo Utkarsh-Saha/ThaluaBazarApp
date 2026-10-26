@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Location from 'expo-location';
 import {
   ArrowLeft,
   User,
@@ -32,24 +31,7 @@ import { COLORS, SHADOWS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { triggerHaptic } from '../../lib/haptics';
-
-const ASSAM_DISTRICTS = [
-  'Darrang',
-  'Kamrup Metropolitan',
-  'Kamrup Rural',
-  'Sonitpur',
-  'Morigaon',
-  'Nagaon',
-  'Udalguri',
-  'Barpeta',
-  'Nalbari',
-  'Biswanath',
-  'Golaghat',
-  'Jorhat',
-  'Sivasagar',
-  'Dibrugarh',
-  'Cachar',
-];
+import { ASSAM_DISTRICTS, getDetailedAddressFromGPS } from '../../lib/location';
 
 export default function BuyerRegisterScreen() {
   const router = useRouter();
@@ -261,35 +243,54 @@ export default function BuyerRegisterScreen() {
     }
   };
 
-  // Auto detect GPS location
+  // Auto detect GPS location with reverse geocoding
   const handleDetectLocation = async () => {
     triggerHaptic('medium');
     setIsLocating(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === 'granted') {
-        const loc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        setLat(loc.coords.latitude);
-        setLng(loc.coords.longitude);
-        triggerHaptic('success');
+      const details = await getDetailedAddressFromGPS({ throwOnError: true });
+      setLat(details.lat);
+      setLng(details.lng);
+      if (details.district) {
+        setDistrict(details.district);
+      }
+      if (details.village) {
+        setVillage(details.village);
+      }
+      if (details.pincode) {
+        setPincode(details.pincode);
+      }
+      // Populate street & landmark into the street address field
+      const streetOrAddr = [details.street, details.landmark].filter(Boolean).join(', ') || details.formattedAddress;
+      if (streetOrAddr) {
+        setAddress(streetOrAddr);
+      }
+
+      triggerHaptic('success');
+      Alert.alert(
+        language === 'as' ? 'স্থান চিনাক্ত হৈছে 📍' : 'Location Detected 📍',
+        language === 'as'
+          ? `স্থান: ${details.formattedAddress}\n(অক্ষাংশ: ${details.lat.toFixed(4)}, দ্ৰাঘিমাংশ: ${details.lng.toFixed(4)})`
+          : `Auto-filled from GPS:\n${details.formattedAddress}\n\nYou can review or edit any field below.`
+      );
+    } catch (e: any) {
+      console.warn('GPS location error:', e);
+      triggerHaptic('error');
+      if (e?.message === 'PERMISSION_DENIED') {
         Alert.alert(
-          language === 'as' ? 'স্থান চিনাক্ত হৈছে' : 'Location Detected',
+          language === 'as' ? 'অৱস্থানৰ অনুমতি প্ৰয়োজন' : 'Location Permission Required',
           language === 'as'
-            ? `অক্ষাংশ: ${loc.coords.latitude.toFixed(4)}, দ্ৰাঘিমাংশ: ${loc.coords.longitude.toFixed(4)}`
-            : `GPS Coordinates successfully captured: ${loc.coords.latitude.toFixed(4)}, ${loc.coords.longitude.toFixed(4)}`
+            ? 'স্বয়ংক্ৰিয় অৱস্থান চিনাক্তকৰণৰ বাবে GPS অনুমতি প্ৰদান কৰক বা হাতেৰে ঠিকনা লিখক।'
+            : 'Please allow location permission to auto-detect your location, or fill in the address fields manually.'
         );
       } else {
         Alert.alert(
-          'Permission Required',
-          'Please allow location access to automatically discover nearby local producers.'
+          language === 'as' ? 'অৱস্থান বিফল হৈছে' : 'Location Detection Failed',
+          language === 'as'
+            ? 'GPS অৱস্থান লাভ কৰিব পৰা নগ\'ল। অনুগ্ৰহ কৰি তলত ঠিকনা হাতেৰে লিখক।'
+            : 'Could not fetch your GPS location. Please manually enter your address details below.'
         );
       }
-    } catch (e: any) {
-      console.warn('GPS location error:', e);
-      setLat(26.435);
-      setLng(92.03);
     } finally {
       setIsLocating(false);
     }

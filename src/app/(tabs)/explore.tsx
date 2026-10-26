@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,15 +8,17 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { Search, Sparkles, MapPin, SlidersHorizontal } from 'lucide-react-native';
+import { Search, Sparkles, MapPin, SlidersHorizontal, X } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { RadiusSlider } from '../../components/RadiusSlider';
 import { CategoryPills } from '../../components/CategoryPills';
 import { ProductCard } from '../../components/ProductCard';
+import { FilterModal } from '../../components/FilterModal';
 import { COLORS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
 import { useListings } from '../../context/ListingsContext';
 import { useAuth } from '../../context/AuthContext';
+import { triggerHaptic } from '../../lib/haptics';
 
 export default function ExploreScreen() {
   const { language, t } = useLanguage();
@@ -29,8 +31,14 @@ export default function ExploreScreen() {
     setSelectedCategory,
     searchQuery,
     setSearchQuery,
+    filters,
+    setFilters,
+    resetFilters,
+    hasActiveFilters,
     filteredListings,
   } = useListings();
+
+  const [showFilterModal, setShowFilterModal] = useState(false);
 
   return (
     <View style={styles.container}>
@@ -59,17 +67,119 @@ export default function ExploreScreen() {
               </View>
             </View>
 
-            {/* Search Input Bar */}
-            <View style={styles.searchContainer}>
-              <Search size={18} color={COLORS.textSecondary} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder={t('search')}
-                placeholderTextColor={COLORS.textMuted}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
+            {/* Search Input Bar with Filter Button */}
+            <View style={styles.searchRow}>
+              <View style={styles.searchContainer}>
+                <Search size={18} color={COLORS.textSecondary} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder={t('search')}
+                  placeholderTextColor={COLORS.textMuted}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.filterBtn, hasActiveFilters && styles.filterBtnActive]}
+                onPress={() => {
+                  triggerHaptic('light');
+                  setShowFilterModal(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <SlidersHorizontal
+                  size={18}
+                  color={hasActiveFilters ? '#FFFFFF' : COLORS.text}
+                />
+                {hasActiveFilters && <View style={styles.filterActiveDot} />}
+              </TouchableOpacity>
             </View>
+
+            {/* Active Filters Strip */}
+            {hasActiveFilters && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.activeFiltersStrip}
+              >
+                {filters.sortBy !== 'distance' && (
+                  <View style={styles.activeFilterChip}>
+                    <Text style={styles.activeFilterChipText}>
+                      {filters.sortBy === 'price_asc'
+                        ? '💰 Price: Low to High'
+                        : filters.sortBy === 'price_desc'
+                        ? '💎 Price: High to Low'
+                        : filters.sortBy === 'rating'
+                        ? '⭐ Top Rated'
+                        : '🌾 Newest'}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        triggerHaptic('light');
+                        setFilters((prev) => ({ ...prev, sortBy: 'distance' }));
+                      }}
+                    >
+                      <X size={12} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {filters.organicOnly && (
+                  <View style={styles.activeFilterChip}>
+                    <Text style={styles.activeFilterChipText}>🌱 Organic Only</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        triggerHaptic('light');
+                        setFilters((prev) => ({ ...prev, organicOnly: false }));
+                      }}
+                    >
+                      <X size={12} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {filters.inStockOnly && (
+                  <View style={styles.activeFilterChip}>
+                    <Text style={styles.activeFilterChipText}>📦 In Stock</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        triggerHaptic('light');
+                        setFilters((prev) => ({ ...prev, inStockOnly: false }));
+                      }}
+                    >
+                      <X size={12} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {filters.maxPrice !== null && (
+                  <View style={styles.activeFilterChip}>
+                    <Text style={styles.activeFilterChipText}>≤ ₹{filters.maxPrice}</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        triggerHaptic('light');
+                        setFilters((prev) => ({ ...prev, maxPrice: null }));
+                      }}
+                    >
+                      <X size={12} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={styles.clearAllFiltersBtn}
+                  onPress={() => {
+                    triggerHaptic('medium');
+                    resetFilters();
+                  }}
+                >
+                  <Text style={styles.clearAllFiltersText}>
+                    {language === 'as' ? 'সকলো মচক' : 'Clear All'}
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+            )}
 
             {/* Hyperlocal Radius Slider Filter */}
             <RadiusSlider radiusKm={radiusKm} onRadiusChange={setRadiusKm} />
@@ -125,6 +235,11 @@ export default function ExploreScreen() {
           </View>
         }
       />
+
+      <FilterModal
+        visible={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+      />
     </View>
   );
 }
@@ -153,18 +268,82 @@ const styles = StyleSheet.create({
     marginTop: 2,
     lineHeight: 16,
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 12,
+    gap: 10,
+  },
   searchContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.surface,
-    marginHorizontal: 16,
-    marginTop: 12,
     paddingHorizontal: 14,
     height: 46,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
     gap: 8,
+  },
+  filterBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterBtnActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  filterActiveDot: {
+    position: 'absolute',
+    top: 9,
+    right: 9,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+  },
+  activeFiltersStrip: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    gap: 8,
+  },
+  activeFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  activeFilterChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  clearAllFiltersBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    justifyContent: 'center',
+  },
+  clearAllFiltersText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textMuted,
   },
   searchInput: {
     flex: 1,

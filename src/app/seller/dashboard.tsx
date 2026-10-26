@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Switch,
   BackHandler,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,6 +26,8 @@ import {
   Power,
   Store,
   Crown,
+  FileText,
+  MessageCircle,
 } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
@@ -35,6 +38,8 @@ import { triggerHaptic } from '../../lib/haptics';
 export default function SellerDashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const cardWidth = Math.floor((screenWidth - 32 - 12) / 2);
   const { language, toggleLanguage, t } = useLanguage();
   const { sellerProfile, toggleSellerOnline, switchRole } = useAuth();
   const { sellerOrders } = useOrders();
@@ -75,6 +80,16 @@ export default function SellerDashboardScreen() {
         </View>
 
         <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.messagesBtn}
+            onPress={() => {
+              triggerHaptic('light');
+              router.push('/messages');
+            }}
+          >
+            <MessageCircle size={15} color={COLORS.primary} />
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.langBtn}
             onPress={() => {
@@ -204,124 +219,208 @@ export default function SellerDashboardScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Main Action Shortcuts Grid (Matching UI Flow C) */}
+        {/* Main Action Shortcuts Grid */}
         <Text style={styles.sectionHeading}>
           {language === 'as' ? 'ব্যৱসায়িক কেন্দ্ৰ' : 'Producer Operations'}
         </Text>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.operationsScrollView}
-          contentContainerStyle={styles.operationsScrollContent}
-        >
+        <View style={styles.operationsGrid}>
           {/* 1. Add Product */}
           <TouchableOpacity
-            style={styles.gridCard}
+            style={[styles.gridCard, { width: cardWidth }]}
             onPress={() => {
               triggerHaptic('light');
               router.push('/seller/add-product');
             }}
             activeOpacity={0.8}
           >
-            <View style={[styles.gridIconBox, { backgroundColor: COLORS.primaryLight }]}>
-              <PlusCircle size={24} color={COLORS.primary} />
+            <View style={styles.cardTopRow}>
+              <View style={[styles.gridIconBox, { backgroundColor: COLORS.primaryLight }]}>
+                <PlusCircle size={22} color={COLORS.primary} />
+              </View>
             </View>
-            <Text style={styles.gridCardTitle} numberOfLines={2}>{t('addProduct')}</Text>
+            <View style={styles.cardBottom}>
+              <Text style={styles.gridCardTitle} numberOfLines={1}>{t('addProduct')}</Text>
+              <Text style={styles.gridCardSubtitle} numberOfLines={1}>
+                {language === 'as' ? 'নতুন ফচল যোগ কৰক' : 'List new produce'}
+              </Text>
+            </View>
           </TouchableOpacity>
 
           {/* 2. My Products */}
           <TouchableOpacity
-            style={styles.gridCard}
+            style={[styles.gridCard, { width: cardWidth }]}
             onPress={() => {
               triggerHaptic('light');
               router.push('/seller/products');
             }}
             activeOpacity={0.8}
           >
-            <View style={[styles.gridIconBox, { backgroundColor: COLORS.secondaryLight }]}>
-              <Package size={24} color={COLORS.secondary} />
+            <View style={styles.cardTopRow}>
+              <View style={[styles.gridIconBox, { backgroundColor: COLORS.secondaryLight }]}>
+                <Package size={22} color={COLORS.secondary} />
+              </View>
             </View>
-            <Text style={styles.gridCardTitle} numberOfLines={2}>{t('myProducts')}</Text>
+            <View style={styles.cardBottom}>
+              <Text style={styles.gridCardTitle} numberOfLines={1}>{t('myProducts')}</Text>
+              <Text style={styles.gridCardSubtitle} numberOfLines={1}>
+                {language === 'as' ? 'মজুত আৰু তালিকা' : 'Inventory & catalog'}
+              </Text>
+            </View>
           </TouchableOpacity>
 
           {/* 3. Orders */}
           <TouchableOpacity
-            style={styles.gridCard}
+            style={[styles.gridCard, { width: cardWidth }]}
             onPress={() => {
               triggerHaptic('light');
               router.push('/seller/orders');
             }}
             activeOpacity={0.8}
           >
-            <View style={[styles.gridIconBox, { backgroundColor: COLORS.accentLight }]}>
-              <ShoppingBag size={24} color={COLORS.accent} />
+            <View style={styles.cardTopRow}>
+              <View style={[styles.gridIconBox, { backgroundColor: COLORS.accentLight }]}>
+                <ShoppingBag size={22} color={COLORS.accent} />
+              </View>
+              {requestedOrdersCount > 0 && (
+                <View style={styles.cardBadge}>
+                  <Text style={styles.cardBadgeText}>{requestedOrdersCount} NEW</Text>
+                </View>
+              )}
             </View>
-            <Text style={styles.gridCardTitle} numberOfLines={2}>{t('orders')}</Text>
+            <View style={styles.cardBottom}>
+              <Text style={styles.gridCardTitle} numberOfLines={1}>{t('orders')}</Text>
+              <Text style={styles.gridCardSubtitle} numberOfLines={1}>
+                {requestedOrdersCount > 0
+                  ? (language === 'as' ? 'নতুন অৰ্ডাৰ গ্ৰহণ কৰক' : `${requestedOrdersCount} pending orders`)
+                  : (language === 'as' ? 'অৰ্ডাৰ পৰিচালনা' : 'Dispatch & tracking')}
+              </Text>
+            </View>
           </TouchableOpacity>
 
           {/* 4. Earnings */}
           <TouchableOpacity
-            style={styles.gridCard}
+            style={[styles.gridCard, { width: cardWidth }]}
             onPress={() => {
               triggerHaptic('light');
               router.push('/seller/earnings');
             }}
             activeOpacity={0.8}
           >
-            <View style={[styles.gridIconBox, { backgroundColor: COLORS.successLight }]}>
-              <IndianRupee size={24} color={COLORS.success} />
+            <View style={styles.cardTopRow}>
+              <View style={[styles.gridIconBox, { backgroundColor: COLORS.successLight }]}>
+                <IndianRupee size={22} color={COLORS.success} />
+              </View>
             </View>
-            <Text style={styles.gridCardTitle} numberOfLines={2}>{t('earnings')}</Text>
+            <View style={styles.cardBottom}>
+              <Text style={styles.gridCardTitle} numberOfLines={1}>{t('earnings')}</Text>
+              <Text style={styles.gridCardSubtitle} numberOfLines={1}>
+                {language === 'as' ? 'বেংক আৰু ধন তোলা' : 'Payouts & ledger'}
+              </Text>
+            </View>
           </TouchableOpacity>
 
           {/* 5. Analytics */}
           <TouchableOpacity
-            style={styles.gridCard}
+            style={[styles.gridCard, { width: cardWidth }]}
             onPress={() => {
               triggerHaptic('light');
               router.push('/seller/analytics');
             }}
             activeOpacity={0.8}
           >
-            <View style={[styles.gridIconBox, { backgroundColor: '#F3E8FF' }]}>
-              <TrendingUp size={24} color="#8B5CF6" />
+            <View style={styles.cardTopRow}>
+              <View style={[styles.gridIconBox, { backgroundColor: '#F3E8FF' }]}>
+                <TrendingUp size={22} color="#8B5CF6" />
+              </View>
             </View>
-            <Text style={styles.gridCardTitle} numberOfLines={2}>{t('analytics')}</Text>
+            <View style={styles.cardBottom}>
+              <Text style={styles.gridCardTitle} numberOfLines={1}>{t('analytics')}</Text>
+              <Text style={styles.gridCardSubtitle} numberOfLines={1}>
+                {language === 'as' ? 'বিক্ৰীৰ প্ৰতিবেদন' : 'Sales performance'}
+              </Text>
+            </View>
           </TouchableOpacity>
 
           {/* 6. Support / KYC */}
           <TouchableOpacity
-            style={styles.gridCard}
+            style={[styles.gridCard, { width: cardWidth }]}
             onPress={() => {
               triggerHaptic('light');
               router.push('/seller/verification');
             }}
             activeOpacity={0.8}
           >
-            <View style={[styles.gridIconBox, { backgroundColor: COLORS.warningLight }]}>
-              <ShieldCheck size={24} color={COLORS.warning} />
+            <View style={styles.cardTopRow}>
+              <View style={[styles.gridIconBox, { backgroundColor: COLORS.warningLight }]}>
+                <ShieldCheck size={22} color={COLORS.warning} />
+              </View>
+              {sellerProfile?.verification_status === 'verified' && (
+                <View style={[styles.cardBadge, { backgroundColor: COLORS.successLight }]}>
+                  <Text style={[styles.cardBadgeText, { color: COLORS.success }]}>✓</Text>
+                </View>
+              )}
             </View>
-            <Text style={styles.gridCardTitle} numberOfLines={2}>KYC & Docs</Text>
+            <View style={styles.cardBottom}>
+              <Text style={styles.gridCardTitle} numberOfLines={1}>
+                {language === 'as' ? 'কেৱাইচি স্থিতি' : 'KYC Verification'}
+              </Text>
+              <Text style={styles.gridCardSubtitle} numberOfLines={1}>
+                {sellerProfile?.verification_status === 'verified'
+                  ? (language === 'as' ? 'প্ৰমাণিত উৎপাদক' : 'Verified Producer')
+                  : (language === 'as' ? 'পৰীক্ষাধীন' : 'Under Review')}
+              </Text>
+            </View>
           </TouchableOpacity>
 
           {/* 7. Seller Subscription */}
           <TouchableOpacity
-            style={styles.gridCard}
+            style={[styles.gridCard, { width: cardWidth }]}
             onPress={() => {
               triggerHaptic('light');
               router.push('/seller/subscription');
             }}
             activeOpacity={0.8}
           >
-            <View style={[styles.gridIconBox, { backgroundColor: '#FFF6E0' }]}>
-              <Crown size={24} color={COLORS.secondary} />
+            <View style={styles.cardTopRow}>
+              <View style={[styles.gridIconBox, { backgroundColor: '#FFF6E0' }]}>
+                <Crown size={22} color={COLORS.secondary} />
+              </View>
             </View>
-            <Text style={styles.gridCardTitle} numberOfLines={2}>
-              {language === 'as' ? 'চাবস্ক্ৰিপশ্বন' : 'Subscription'}
-            </Text>
+            <View style={styles.cardBottom}>
+              <Text style={styles.gridCardTitle} numberOfLines={1}>
+                {language === 'as' ? 'সদস্যপদ প্লেন' : 'Membership'}
+              </Text>
+              <Text style={styles.gridCardSubtitle} numberOfLines={1}>
+                {language === 'as' ? 'সদস্যপদ নবীকৰণ' : 'Active • ₹20/mo'}
+              </Text>
+            </View>
           </TouchableOpacity>
-        </ScrollView>
+
+          {/* 8. Documents & Certificates */}
+          <TouchableOpacity
+            style={[styles.gridCard, { width: cardWidth }]}
+            onPress={() => {
+              triggerHaptic('light');
+              router.push('/seller/documents');
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={styles.cardTopRow}>
+              <View style={[styles.gridIconBox, { backgroundColor: '#E0F2FE' }]}>
+                <FileText size={22} color="#0284C7" />
+              </View>
+            </View>
+            <View style={styles.cardBottom}>
+              <Text style={styles.gridCardTitle} numberOfLines={1}>
+                {language === 'as' ? 'নথিপত্ৰ আপলোড' : 'Documents & ID'}
+              </Text>
+              <Text style={styles.gridCardSubtitle} numberOfLines={1}>
+                {language === 'as' ? 'প্ৰমাণপত্ৰ আৰু ফটো' : 'Certificates & Proofs'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
 
         {/* Incoming Orders Alert Box */}
         {requestedOrdersCount > 0 && (
@@ -386,6 +485,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  messagesBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   langBtn: {
     flexDirection: 'row',
@@ -515,41 +622,61 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginTop: 6,
   },
-  operationsScrollView: {
-    marginHorizontal: -16,
-  },
-  operationsScrollContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+  operationsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
+    marginTop: 8,
   },
   gridCard: {
-    width: 104,
-    minHeight: 112,
+    minHeight: 118,
     backgroundColor: COLORS.surface,
     borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 14,
+    justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: COLORS.borderLight,
     ...SHADOWS.sm,
-    gap: 8,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
   },
   gridIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  cardBadge: {
+    backgroundColor: COLORS.secondary,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  cardBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  cardBottom: {
+    width: '100%',
+    marginTop: 10,
+  },
   gridCardTitle: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     color: COLORS.text,
-    textAlign: 'center',
-    lineHeight: 15,
+    letterSpacing: -0.2,
+  },
+  gridCardSubtitle: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2,
+    fontWeight: '500',
   },
   incomingAlertCard: {
     backgroundColor: '#FEF3C7',

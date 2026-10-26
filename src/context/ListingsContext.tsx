@@ -1,8 +1,34 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { Listing, ProductCategory, ContactUnlock } from '../types';
 import { INITIAL_LISTINGS, INITIAL_CATEGORIES } from '../constants/mockData';
-import { calculateDistanceKm, DEFAULT_COORDS } from '../lib/location';
+import {
+  calculateDistanceKm,
+  DEFAULT_COORDS,
+  UserCoords,
+  getCurrentUserLocation,
+  loadSavedUserCoords,
+  saveUserCoordsToStorage,
+  ASSAM_DISTRICT_CENTROIDS,
+} from '../lib/location';
 import { supabase } from '../lib/supabase';
+
+export type SortOption = 'distance' | 'price_asc' | 'price_desc' | 'rating' | 'newest';
+
+export interface FilterOptions {
+  organicOnly: boolean;
+  inStockOnly: boolean;
+  maxPrice: number | null;
+  minRating: number | null;
+  sortBy: SortOption;
+}
+
+export const DEFAULT_FILTERS: FilterOptions = {
+  organicOnly: false,
+  inStockOnly: false,
+  maxPrice: null,
+  minRating: null,
+  sortBy: 'distance',
+};
 
 interface ListingsContextType {
   listings: Listing[];
@@ -13,6 +39,10 @@ interface ListingsContextType {
   setSelectedCategory: (catId: string | null) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  filters: FilterOptions;
+  setFilters: React.Dispatch<React.SetStateAction<FilterOptions>>;
+  resetFilters: () => void;
+  hasActiveFilters: boolean;
   filteredListings: Listing[];
   getListingById: (id: string) => Listing | undefined;
   addNewListing: (listingData: Omit<Listing, 'id' | 'created_at'>) => Promise<Listing>;
@@ -24,6 +54,11 @@ interface ListingsContextType {
   isWishlisted: (listingId: string) => boolean;
   refreshListings: () => Promise<void>;
   isLoading: boolean;
+  userCoords: UserCoords;
+  setUserCoords: (coords: UserCoords) => void;
+  isDetectingLocation: boolean;
+  detectAndSetLocation: () => Promise<UserCoords>;
+  selectDistrictCoords: (district: string) => void;
 }
 
 const ListingsContext = createContext<ListingsContextType | undefined>(undefined);
@@ -38,11 +73,70 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   
+  // Advanced catalog filters
+  const [filters, setFilters] = useState<FilterOptions>(DEFAULT_FILTERS);
+
+  const resetFilters = useCallback(() => {
+    setFilters(DEFAULT_FILTERS);
+  }, []);
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      filters.organicOnly ||
+      filters.inStockOnly ||
+      filters.maxPrice !== null ||
+      filters.minRating !== null ||
+      filters.sortBy !== 'distance'
+    );
+  }, [filters]);
+  
   // Masked contact unlock records
   const [unlockedContacts, setUnlockedContacts] = useState<Record<string, boolean>>({});
   
   // Wishlist state
   const [wishlist, setWishlist] = useState<string[]>(['l1', 'l3']);
+
+  // Dynamic User GPS Location State
+  const [userCoords, setUserCoords] = useState<UserCoords>(DEFAULT_COORDS);
+  const [isDetectingLocation, setIsDetectingLocation] = useState<boolean>(false);
+
+  // Initialize cached location on mount
+  useEffect(() => {
+    async function initLocation() {
+      const cached = await loadSavedUserCoords();
+      if (cached) {
+        setUserCoords(cached);
+      }
+    }
+    initLocation();
+  }, []);
+
+  const detectAndSetLocation = useCallback(async (): Promise<UserCoords> => {
+    setIsDetectingLocation(true);
+    try {
+      const detected = await getCurrentUserLocation();
+      setUserCoords(detected);
+      return detected;
+    } finally {
+      setIsDetectingLocation(false);
+    }
+  }, []);
+
+  const selectDistrictCoords = useCallback((district: string) => {
+    const centroid = ASSAM_DISTRICT_CENTROIDS[district];
+    if (centroid) {
+      const newCoords: UserCoords = {
+        lat: centroid.lat,
+        lng: centroid.lng,
+        district,
+        village: centroid.village,
+        formattedAddress: `${centroid.village}, ${district} (Assam)`,
+        isCustomSelected: true,
+      };
+      setUserCoords(newCoords);
+      saveUserCoordsToStorage(newCoords);
+    }
+  }, []);
 
   const mapDbListing = (row: any): Listing => ({
     id: row.id.toString(),
@@ -141,30 +235,75 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const isWishlisted = (listingId: string) => wishlist.includes(listingId);
 
-  // Filter listings based on radius, category, search query and active status
-  const filteredListings = listings.filter((item) => {
-    // Distance check
-    const dist = calculateDistanceKm(
-      DEFAULT_COORDS.lat,
-      DEFAULT_COORDS.lng,
-      item.lat,
-      item.lng
-    );
-    const inRadius = dist <= radiusKm;
+  // Filter listings based on radius, category, search query and active status with real GPS distance
+  const filteredListings = useMemo(() => {
+    return listings
+      .map((item) => {
+        const dist = calculateDistanceKm(
+          userCoords.lat,
+          userCoords.lng,
+          item.lat,
+          item.lng
+        );
+        return {
+          ...item,
+          distance_km: dist,
+        };
+      })
+      .filter((item) => {
+        // Distance check
+        const inRadius = item.distance_km <= radiusKm;
 
-    // Category filter
-    const matchesCategory = selectedCategory ? item.category_id === selectedCategory : true;
+        // Category filter
+        const matchesCategory = selectedCategory ? item.category_id === selectedCategory : true;
 
-    // Search query filter (matches English or Assamese title / seller name / village)
-    const matchesSearch = searchQuery
-      ? item.title_en.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.title_as.includes(searchQuery) ||
-        item.seller_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.village.toLowerCase().includes(searchQuery.toLowerCase())
-      : true;
+        // Search query filter (matches English or Assamese title / seller name / village / district)
+        const matchesSearch = searchQuery
+          ? item.title_en.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.title_as.includes(searchQuery) ||
+            item.seller_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.village.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.district.toLowerCase().includes(searchQuery.toLowerCase())
+          : true;
 
-    return inRadius && matchesCategory && matchesSearch;
-  });
+        // Organic certified filter
+        const matchesOrganic = filters.organicOnly ? item.is_organic : true;
+
+        // In-stock only filter
+        const matchesInStock = filters.inStockOnly ? item.stock > 0 && item.status !== 'sold_out' : true;
+
+        // Max price filter
+        const matchesPrice = filters.maxPrice !== null ? item.price <= filters.maxPrice : true;
+
+        // Min rating filter
+        const matchesRating = filters.minRating !== null ? (item.rating || 0) >= filters.minRating : true;
+
+        return (
+          inRadius &&
+          matchesCategory &&
+          matchesSearch &&
+          matchesOrganic &&
+          matchesInStock &&
+          matchesPrice &&
+          matchesRating
+        );
+      })
+      .sort((a, b) => {
+        switch (filters.sortBy) {
+          case 'price_asc':
+            return a.price - b.price;
+          case 'price_desc':
+            return b.price - a.price;
+          case 'rating':
+            return (b.rating || 0) - (a.rating || 0);
+          case 'newest':
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          case 'distance':
+          default:
+            return a.distance_km - b.distance_km;
+        }
+      });
+  }, [listings, userCoords, radiusKm, selectedCategory, searchQuery, filters]);
 
   const getListingById = (id: string) => {
     return listings.find((l) => l.id === id);
@@ -288,6 +427,10 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setSelectedCategory,
         searchQuery,
         setSearchQuery,
+        filters,
+        setFilters,
+        resetFilters,
+        hasActiveFilters,
         filteredListings,
         getListingById,
         addNewListing,
@@ -299,6 +442,11 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isWishlisted,
         refreshListings,
         isLoading,
+        userCoords,
+        setUserCoords,
+        isDetectingLocation,
+        detectAndSetLocation,
+        selectDistrictCoords,
       }}
     >
       {children}

@@ -306,6 +306,38 @@ alter table if exists public.contact_unlocks add column if not exists listing_id
 alter table if exists public.contact_unlocks add column if not exists payment_status text default 'free_tier';
 alter table if exists public.contact_unlocks add column if not exists created_at timestamp with time zone default timezone('utc'::text, now());
 
+-- 12. USER ADDRESSES (Multi-Address Book Persistence)
+create table if not exists public.user_addresses (
+  id uuid default uuid_generate_v4() primary key,
+  user_id text not null,
+  name text not null,
+  phone text not null,
+  type text default 'home', -- 'home', 'work', 'farm'
+  street text not null,
+  village text,
+  district text,
+  pincode text,
+  landmark text,
+  is_default boolean default false,
+  lat double precision,
+  lng double precision,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table if exists public.user_addresses add column if not exists user_id text;
+alter table if exists public.user_addresses add column if not exists name text;
+alter table if exists public.user_addresses add column if not exists phone text;
+alter table if exists public.user_addresses add column if not exists type text default 'home';
+alter table if exists public.user_addresses add column if not exists street text;
+alter table if exists public.user_addresses add column if not exists village text;
+alter table if exists public.user_addresses add column if not exists district text;
+alter table if exists public.user_addresses add column if not exists pincode text;
+alter table if exists public.user_addresses add column if not exists landmark text;
+alter table if exists public.user_addresses add column if not exists is_default boolean default false;
+alter table if exists public.user_addresses add column if not exists lat double precision;
+alter table if exists public.user_addresses add column if not exists lng double precision;
+alter table if exists public.user_addresses add column if not exists created_at timestamp with time zone default timezone('utc'::text, now());
+
 -- ==========================================================
 -- POSTGIS GEOSPATIAL SEARCH FUNCTIONS
 -- ==========================================================
@@ -546,3 +578,66 @@ create policy "Allow public read product images" on storage.objects for select u
 create policy "Allow authenticated upload product images" on storage.objects for insert with check (bucket_id = 'product-images');
 create policy "Allow public read seller documents" on storage.objects for select using (bucket_id = 'seller-documents');
 create policy "Allow authenticated upload seller documents" on storage.objects for insert with check (bucket_id = 'seller-documents');
+
+-- 13. CONVERSATIONS TABLE
+create table if not exists public.conversations (
+  id uuid default uuid_generate_v4() primary key,
+  buyer_id text not null,
+  buyer_name text not null,
+  seller_id text not null,
+  seller_name text not null,
+  seller_phone text,
+  listing_id text,
+  listing_title text,
+  last_message_text text,
+  last_message_at timestamp with time zone default timezone('utc'::text, now()),
+  buyer_unread_count integer default 0,
+  seller_unread_count integer default 0,
+  created_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+-- 14. MESSAGES TABLE
+create table if not exists public.messages (
+  id uuid default uuid_generate_v4() primary key,
+  conversation_id uuid references public.conversations(id) on delete cascade not null,
+  sender_id text not null,
+  sender_name text not null,
+  sender_role text not null check (sender_role in ('buyer', 'seller')),
+  recipient_id text not null,
+  message_type text not null default 'text' check (message_type in ('text', 'audio', 'order_inquiry')),
+  text text,
+  audio_url text,
+  audio_duration_seconds integer default 0,
+  metadata jsonb default '{}'::jsonb,
+  is_read boolean default false,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists idx_conversations_buyer on public.conversations (buyer_id);
+create index if not exists idx_conversations_seller on public.conversations (seller_id);
+create index if not exists idx_messages_conversation on public.messages (conversation_id);
+create index if not exists idx_messages_created_at on public.messages (created_at);
+
+alter table public.conversations enable row level security;
+alter table public.messages enable row level security;
+
+drop policy if exists "Allow read conversations" on public.conversations;
+drop policy if exists "Allow insert conversations" on public.conversations;
+drop policy if exists "Allow update conversations" on public.conversations;
+create policy "Allow read conversations" on public.conversations for select using (true);
+create policy "Allow insert conversations" on public.conversations for insert with check (true);
+create policy "Allow update conversations" on public.conversations for update using (true);
+
+drop policy if exists "Allow read messages" on public.messages;
+drop policy if exists "Allow insert messages" on public.messages;
+drop policy if exists "Allow update messages" on public.messages;
+create policy "Allow read messages" on public.messages for select using (true);
+create policy "Allow insert messages" on public.messages for insert with check (true);
+create policy "Allow update messages" on public.messages for update using (true);
+
+-- Storage bucket for audio voice notes
+insert into storage.buckets (id, name, public) values ('chat-audio', 'chat-audio', true) on conflict do nothing;
+drop policy if exists "Allow public read chat audio" on storage.objects;
+drop policy if exists "Allow upload chat audio" on storage.objects;
+create policy "Allow public read chat audio" on storage.objects for select using (bucket_id = 'chat-audio');
+create policy "Allow upload chat audio" on storage.objects for insert with check (bucket_id = 'chat-audio');

@@ -8,15 +8,18 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, ArrowRight, Users, User, Building } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Users, User, Building, Navigation } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { SellerType } from '../../types';
 import { triggerHaptic } from '../../lib/haptics';
+import { getDetailedAddressFromGPS } from '../../lib/location';
 
 export default function SellerRegisterScreen() {
   const router = useRouter();
@@ -30,6 +33,44 @@ export default function SellerRegisterScreen() {
   const [village, setVillage] = useState('');
   const [district, setDistrict] = useState('Darrang');
   const [upiId, setUpiId] = useState('');
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+
+  const handleDetectLocation = async () => {
+    triggerHaptic('medium');
+    setIsDetectingLocation(true);
+    try {
+      const details = await getDetailedAddressFromGPS({ throwOnError: true });
+      if (details.district) setDistrict(details.district);
+      if (details.village) setVillage(details.village);
+      triggerHaptic('success');
+      Alert.alert(
+        language === 'as' ? 'স্থান চিনাক্ত হৈছে 📍' : 'Location Detected 📍',
+        language === 'as'
+          ? `জিলা: ${details.district}, গাওঁ: ${details.village}`
+          : `Auto-filled location from GPS:\n• District: ${details.district}\n• Village/Town: ${details.village}`
+      );
+    } catch (err: any) {
+      console.warn('GPS detection failed:', err);
+      triggerHaptic('error');
+      if (err?.message === 'PERMISSION_DENIED') {
+        Alert.alert(
+          language === 'as' ? 'অৱস্থানৰ অনুমতি প্ৰয়োজন' : 'Location Permission Required',
+          language === 'as'
+            ? 'স্বয়ংক্ৰিয় অৱস্থান চিনাক্তকৰণৰ বাবে GPS অনুমতি প্ৰদান কৰক বা হাতেৰে ঠিকনা লিখক।'
+            : 'Please grant location permission to auto-detect your location, or enter your village and district manually.'
+        );
+      } else {
+        Alert.alert(
+          language === 'as' ? 'GPS বিফল হৈছে' : 'GPS Auto-Detection Failed',
+          language === 'as'
+            ? 'GPS ৰ জৰিয়তে ঠিকনা লাভ কৰিব নোৱাৰিলে। অনুগ্ৰহ কৰি নিজে লিখক।'
+            : 'Could not resolve current location via GPS. You can enter your village and district manually.'
+        );
+      }
+    } finally {
+      setIsDetectingLocation(false);
+    }
+  };
 
   const handleNext = async () => {
     triggerHaptic('medium');
@@ -184,6 +225,28 @@ export default function SellerRegisterScreen() {
             />
           </>
         )}
+
+        {/* Village & District Header Row with GPS Button */}
+        <View style={styles.locationHeaderRow}>
+          <Text style={styles.label}>{language === 'as' ? 'অৱস্থানৰ বিৱৰণ' : 'Location Details'}</Text>
+          <TouchableOpacity
+            style={styles.gpsAutoFillBtn}
+            onPress={handleDetectLocation}
+            disabled={isDetectingLocation}
+            activeOpacity={0.8}
+          >
+            {isDetectingLocation ? (
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            ) : (
+              <Navigation size={13} color={COLORS.primary} />
+            )}
+            <Text style={styles.gpsAutoFillBtnText}>
+              {isDetectingLocation
+                ? (language === 'as' ? 'চিনাক্ত...' : 'Locating...')
+                : (language === 'as' ? 'GPS অৱস্থান' : 'Auto-fill GPS')}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Village & District */}
         <View style={styles.rowInputs}>
@@ -348,6 +411,26 @@ const styles = StyleSheet.create({
   rowInputs: {
     flexDirection: 'row',
     gap: 12,
+  },
+  locationHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  gpsAutoFillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: COLORS.primaryLight,
+  },
+  gpsAutoFillBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
   nextBtn: {
     backgroundColor: COLORS.primary,

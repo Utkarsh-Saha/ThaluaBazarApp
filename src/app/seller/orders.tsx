@@ -18,6 +18,7 @@ import {
   Phone,
   Clock,
   CheckCircle2,
+  MessageCircle,
 } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
@@ -149,6 +150,29 @@ export default function SellerOrdersScreen() {
                   <Text style={styles.orderNumber}>{item.order_number}</Text>
                   <Text style={styles.buyerName}>👤 {item.buyer_name}</Text>
                   <Text style={styles.buyerPhone}>📞 {item.buyer_phone}</Text>
+                  <TouchableOpacity
+                    style={styles.chatBuyerBtn}
+                    onPress={() => {
+                      triggerHaptic('light');
+                      router.push({
+                        pathname: `/chat/order-${item.id}`,
+                        params: {
+                          sellerId: item.seller_id,
+                          sellerName: item.seller_name,
+                          sellerPhone: item.seller_phone,
+                          buyerId: item.buyer_id,
+                          buyerName: item.buyer_name,
+                          listingTitle: item.items[0]?.title || `Order #${item.order_number}`,
+                        },
+                      });
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <MessageCircle size={12} color={COLORS.primary} />
+                    <Text style={styles.chatBuyerBtnText}>
+                      {language === 'as' ? 'গ্ৰাহকৰ সৈতে চাট' : 'Chat with Buyer'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
 
                 <View style={styles.headerRight}>
@@ -343,6 +367,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textSecondary,
     marginTop: 1,
+  },
+  chatBuyerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: COLORS.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  chatBuyerBtnText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.primaryDark,
   },
   headerRight: {
     alignItems: 'flex-end',

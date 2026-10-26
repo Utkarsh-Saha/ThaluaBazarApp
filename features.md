@@ -12,25 +12,20 @@ Thaluwa Bazar is a hyperlocal rural-to-urban commerce and producer empowerment p
 
 ### Active Repository Structure:
 - **Mobile Client (`src/`)**: Expo Router app supporting dual roles (Buyer & Producer/Seller), bilingual internationalization (English & Assamese), PostGIS distance-based search, product catalog, cart/checkout, and order fulfillment steppers.
-- **Web Admin Panel (`admin-panel/`)**: React + Vite dashboard for district coordinators and platform admins to moderate listings, verify seller KYC, manage disputes, and inspect platform GMV.
-- **Backend Service (`backend/`)**: Express REST service with Supabase Admin client, JWT authentication, and PostGIS distance calculations.
+- **Web Admin Panel (`admin-panel/`)**: React + Vite dashboard for district coordinators and platform admins to moderate listings, verify seller KYC, manage disputes, inspect platform GMV, and audit administrative events.
+- **Backend Service (`backend/`)**: Express REST service with Supabase Admin client, JWT authentication, audit logging engine, and PostGIS distance calculations.
 - **Database (`supabase/` & `backend/src/database/`)**: PostgreSQL schema with PostGIS spatial indexing (`geography(Point, 4326)`), row-level security (RLS), and realtime change streams.
 
 ---
 
-## 2. Feature Status Matrix
+## 2. Feature Status Matrix (Remaining & Pending Roadmap)
 
 | Module | Feature | Current State | Target Priority | Technical Debt / Remaining Work |
 | :--- | :--- | :---: | :---: | :--- |
 | **Payments** | UPI Intent & Payment Gateway | ⚠️ Mock / UI Only | **P0** | No live Razorpay/Cashfree/UPI deep-link; orders bypass payment capture. |
-| **Notifications** | Push Notifications (Expo / FCM) | ✅ Completed | **P0** | `expo-notifications` SDK 58, token auto-sync, Supabase realtime & live in-app notification feed. |
-| **Finances** | Seller Payouts & Settlement | ✅ Completed | **P0** | Live Supabase `seller_payouts` ledger, real UTR generation, Admin disbursement & realtime sync. |
-| **Feedback** | Product & Seller Reviews UI | ⚠️ Backend Only | **P0** | `reviews` table and API exist, but mobile has no review submission UI on completed orders. |
-| **Analytics** | Producer Dashboard Analytics | ⚠️ Hardcoded Mock | **P0** | `seller/analytics.tsx` displays static `₹45,000` chart; needs dynamic order aggregation. |
-| **Geolocation** | Real GPS & Assam Reverse Geocode | ⚠️ Hardcoded Fallback | **P1** | Default coordinates set to Guwahati; needs `expo-location` GPS lock & village resolver. |
-| **Communication**| Buyer-Seller Direct Messaging | ⚠️ External Call Only | **P1** | Masked contact opens phone/WhatsApp; lacks in-app chat & audio voice notes. |
-| **Buyer Profile** | Cloud Address Book | ⚠️ In-Memory State | **P1** | Address book in `addresses.tsx` does not persist multi-address records to Supabase. |
-| **Search** | Filter Engine (Organic/In-Stock/Sort) | ⚠️ Partial Filter | **P1** | Search bar filters by text and radius; missing price sliders, organic filter, and sort orders. |
+| **Communication**| Buyer-Seller Direct Messaging | ✅ Complete | **P1** | In-app direct chat, 30s voice notes via `expo-audio`, Realtime WebSocket, WhatsApp quick-orders. |
+| **Buyer Profile** | Cloud Address Book | ✅ Complete | **P1** | Multi-address cloud persistence via `user_addresses`, local offline fallback, and checkout chips. |
+| **Search** | Filter Engine (Organic/In-Stock/Sort) | ✅ Complete | **P1** | Bottom-sheet modal with organic certification, stock availability, max price, and 5 sort criteria. |
 | **B2B / Commerce**| Wholesale & Bulk Orders | ❌ Backlog | **P1** | No volume tiers or Request For Quote (RFQ) for grocers and restaurants. |
 | **Accessibility**| Assamese Voice Search | ❌ Backlog | **P2** | Voice query input for low-literacy rural producers and elderly buyers. |
 | **Delivery** | Village Courier / Delivery Boy Role | ❌ Backlog | **P2** | Platform lacks third-party dispatch role; relies solely on self-pickup or producer delivery. |
@@ -52,72 +47,7 @@ Thaluwa Bazar is a hyperlocal rural-to-urban commerce and producer empowerment p
 
 ---
 
-### 3.2 Real-Time Push Notifications (Expo Notifications + FCM)
-* **Current State:** `src/app/notifications.tsx` displays a static mock array (`INITIAL_NOTIFICATIONS`). If a seller accepts or delivers an order, buyers receive no device push notification when the app is closed.
-* **Remaining Work:**
-  1. Add `expo-notifications` and `expo-device` to mobile client.
-  2. Register device push tokens on authentication and save to `users.push_token` in Supabase.
-  3. Wire backend `notificationService.ts` to dispatch Expo push tickets whenever an order changes status (`REQUESTED` → `ACCEPTED` → `OUT_FOR_DELIVERY` → `COMPLETED`).
-  4. Query live notifications from the Supabase `notifications` table in `src/app/notifications.tsx` with realtime subscription.
-
----
-
-### 3.3 Seller Payouts Ledger & Database Migration
-* **Current State:**
-  - `adminController.ts` references a table called `seller_payouts`, but this table was omitted from `schema.sql`.
-  - In `src/app/seller/earnings.tsx`, clicking "Withdraw to UPI" triggers a dummy `setTimeout` and resets state locally.
-* **Remaining Work:**
-  1. **Create `seller_payouts` Database Table:**
-     ```sql
-     CREATE TABLE IF NOT EXISTS seller_payouts (
-       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-       seller_id UUID REFERENCES seller_profiles(id) ON DELETE CASCADE,
-       amount NUMERIC(10, 2) NOT NULL,
-       status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'processing', 'completed', 'failed'
-       upi_id VARCHAR(100) NOT NULL,
-       utr_ref VARCHAR(100),
-       requested_at TIMESTAMPTZ DEFAULT NOW(),
-       processed_at TIMESTAMPTZ,
-       created_at TIMESTAMPTZ DEFAULT NOW()
-     );
-     ```
-  2. Connect `src/app/seller/earnings.tsx` to insert a row into `seller_payouts` when a payout is requested.
-  3. Enable Admin Web Panel to view pending payout requests and approve them with UTR entry.
-
----
-
-### 3.4 Interactive Reviews & Rating Submission Modal
-* **Current State:** The database table `reviews` and backend `reviewsRoutes.ts` exist, but there is no mobile interface allowing a buyer to submit a rating or write feedback.
-* **Remaining Work:**
-  1. In `src/app/(tabs)/orders.tsx`, add a "Rate & Review" button on orders with `status === 'COMPLETED'`.
-  2. Build a modal with:
-     - 5-Star interactive rating selector.
-     - Assamese/English text review input.
-     - Optional photo attachment of delivered produce.
-  3. Display average rating and review counts dynamically on `src/app/product/[id].tsx` and in the seller profile summary.
-
----
-
-### 3.5 Real-Time Dynamic Seller Analytics
-* **Current State:** `src/app/seller/analytics.tsx` renders static mock revenue data (`₹45,000`, `Mon: ₹3k`, `Tue: ₹6k`, etc.).
-* **Remaining Work:**
-  1. Build backend endpoint `GET /api/seller/analytics` or a Supabase RPC query that groups the authenticated seller's completed orders by day/week/month:
-     - Total Revenue over selected window (Last 7 Days, Last 30 Days, Year-to-Date).
-     - Top-selling produce items by volume and gross value.
-     - Conversion rate (views vs orders).
-  2. Connect `src/app/seller/analytics.tsx` to display real order data on the visual bar charts.
-
----
-
 ## 4. P1: High-Impact Core Enhancements
-
-### 4.1 Live GPS Geolocation & Assam Village Reverse Geocoding
-* **Current Implementation:** Location defaults to static coordinates (Guwahati: 26.1445, 91.7362).
-* **Enhancement:**
-  - Integrate `expo-location` to request foreground GPS permissions.
-  - Implement a "Detect My Location" button in Explore header and address checkout.
-  - Perform reverse geocoding to resolve the user's exact Assam District (e.g. Kamrup, Nalbari, Barpeta, Jorhat, Dibrugarh) and village locality.
-  - Recalculate PostGIS distances dynamically based on user's current physical coordinates.
 
 ---
 
@@ -205,30 +135,22 @@ Thaluwa Bazar is a hyperlocal rural-to-urban commerce and producer empowerment p
 gantt
     title Thaluwa Bazar Implementation Roadmap
     dateFormat  YYYY-MM-DD
-    section Sprint 1: Finance & Payments
-    Create seller_payouts DB Table & API      :done, s1a, 2026-10-26, 2d
-    UPI Intent & Deep-Link Checkout           :active, s1b, after s1a, 3d
-    Live Earnings Withdrawal Flow              :s1c, after s1b, 2d
-    section Sprint 2: Realtime & Notifications
-    Expo Notifications SDK Setup              :s2a, after s1c, 2d
-    Supabase Realtime Notifications Feed      :s2b, after s2a, 3d
-    Live Order Alert Triggers                 :s2c, after s2b, 2d
-    section Sprint 3: Discovery & Reviews
-    Interactive Reviews & Rating Modal         :s3a, after s2c, 3d
-    Dynamic Analytics Backend Integration     :s3b, after s3a, 3d
-    Native Device GPS & Reverse Geocoding     :s3c, after s3b, 2d
-    section Sprint 4: Rural Accessibility
-    In-App Audio Voice Notes                   :s4a, after s3c, 4d
-    B2B Bulk Produce Tier                      :s4b, after s4a, 3d
+    section Sprint 1: Payments & Addresses
+    UPI Intent & Deep-Link Checkout           :active, s1a, 2026-10-26, 3d
+    Cloud user_addresses Supabase Persistence :s1b, after s1a, 2d
+    section Sprint 2: Catalog & Discovery
+    Advanced Catalog Filters (Price/Organic)  :s2a, after s1b, 3d
+    B2B Bulk Produce & Wholesale Tier         :s2b, after s2a, 3d
+    section Sprint 3: Rural Communication
+    In-App Audio Voice Notes & Direct Chat    :s3a, after s2b, 4d
+    Assamese Voice Search Assistant           :s3b, after s3a, 4d
 ```
 
 ---
 
 ## 7. Immediate Action Checklist
 
-- [ ] **Database**: Execute `seller_payouts` and `user_addresses` migration script on Supabase.
-- [ ] **Mobile App**: Replace checkout simulated placement with UPI deep-link intent trigger.
-- [ ] **Mobile App**: Replace mock `INITIAL_NOTIFICATIONS` in `src/app/notifications.tsx` with live database query.
-- [ ] **Mobile App**: Connect `src/app/seller/earnings.tsx` to trigger real payout records in `seller_payouts`.
-- [ ] **Mobile App**: Build "Rate Order" star rating modal on completed orders in `src/app/(tabs)/orders.tsx`.
-- [ ] **Admin Web**: Enable Admin Payouts table view and UTR disbursement action.
+- [ ] **Mobile App**: Replace checkout simulated placement with native UPI deep-link intent trigger (`upi://pay?pa=...`).
+- [x] **Database**: Added `user_addresses` schema migration in `backend/src/database/schema.sql`.
+- [x] **Mobile App**: Connected `src/app/addresses.tsx` and Checkout address picker to live `user_addresses` with `AsyncStorage` offline resilience.
+- [x] **Mobile App**: Added `FilterModal` in `explore.tsx` with organic produce toggle, in-stock filter, price limit presets, and dynamic sort order.

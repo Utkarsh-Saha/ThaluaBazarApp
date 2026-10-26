@@ -29,13 +29,14 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useListings } from '../../context/ListingsContext';
 import { useCart } from '../../context/CartContext';
 import { triggerHaptic } from '../../lib/haptics';
+import { calculateDistanceKm } from '../../lib/location';
 
 export default function ProductDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { language, t } = useLanguage();
-  const { getListingById } = useListings();
+  const { getListingById, userCoords } = useListings();
   const { cart, addToCart } = useCart();
 
   const [quantity, setQuantity] = useState(1);
@@ -55,6 +56,12 @@ export default function ProductDetailScreen() {
   const title = language === 'as' ? listing.title_as : listing.title_en;
   const description = language === 'as' ? listing.description_as : listing.description_en;
   const categoryName = language === 'as' ? listing.category_name_as : listing.category_name_en;
+  const distanceKm = calculateDistanceKm(
+    userCoords.lat,
+    userCoords.lng,
+    listing.lat,
+    listing.lng
+  );
 
   const handleAddToCart = () => {
     triggerHaptic('medium');
@@ -79,7 +86,16 @@ export default function ProductDetailScreen() {
       >
         {/* Image Header with Back & Share */}
         <View style={styles.imageHeader}>
-          <Image source={{ uri: listing.image_url }} style={styles.productImage} resizeMode="cover" />
+          <Image
+            source={{
+              uri:
+                listing.image_url && listing.image_url.trim().length > 0
+                  ? listing.image_url
+                  : 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600',
+            }}
+            style={styles.productImage}
+            resizeMode="cover"
+          />
 
           <View style={[styles.topActions, { top: insets.top + 8 }]}>
             <TouchableOpacity
@@ -201,17 +217,18 @@ export default function ProductDetailScreen() {
                   </View>
                 </View>
                 <Text style={styles.sellerLocation}>
-                  📍 {listing.village}, {listing.district}
+                  📍 {listing.village}, {listing.district} • {distanceKm} km {language === 'as' ? 'দূৰত্বত' : 'away'}
                 </Text>
               </View>
             </View>
 
-            {/* Masked Contact Privacy Action */}
+            {/* Masked Contact Privacy & Direct Chat Action */}
             <MaskedContactButton
               listingId={listing.id}
               sellerId={listing.seller_id}
               sellerPhone={listing.seller_phone}
               sellerName={listing.seller_name}
+              listingTitle={language === 'as' ? listing.title_as : listing.title_en}
             />
           </View>
         </View>
