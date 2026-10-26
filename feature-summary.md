@@ -6,10 +6,8 @@
 
 ---
 
-### 3. Rural Accessibility & Scaling (P2 Priority)
+### 2. Rural Accessibility & Scaling (P2 Priority)
 
-- **Assamese Voice Search:** Conversational speech-to-text product search (e.g., *"মোক ২ কেজি জহা চাউল লাগে"*).
-- **Offline First Support & Sync Queue:** Cache nearby catalog listings for areas with weak or intermittent 3G/4G network coverage.
 - **Village Delivery Partner ("Village Delivery Hero") Role:** Third app role for local youth with bicycles/motorcycles to deliver produce from farm clusters to pickup points.
 - **Automated SMS Fallback:** Send SMS alerts via Twilio/Gupshup if a producer has not opened an order confirmation within 15 minutes.
 

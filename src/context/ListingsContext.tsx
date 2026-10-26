@@ -11,6 +11,7 @@ import {
   ASSAM_DISTRICT_CENTROIDS,
 } from '../lib/location';
 import { supabase } from '../lib/supabase';
+import { offlineSyncManager } from '../lib/offlineSync';
 
 export type SortOption = 'distance' | 'price_asc' | 'price_desc' | 'rating' | 'newest';
 
@@ -59,6 +60,7 @@ interface ListingsContextType {
   isDetectingLocation: boolean;
   detectAndSetLocation: () => Promise<UserCoords>;
   selectDistrictCoords: (district: string) => void;
+  isOffline: boolean;
 }
 
 const ListingsContext = createContext<ListingsContextType | undefined>(undefined);
@@ -99,6 +101,7 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Dynamic User GPS Location State
   const [userCoords, setUserCoords] = useState<UserCoords>(DEFAULT_COORDS);
   const [isDetectingLocation, setIsDetectingLocation] = useState<boolean>(false);
+  const [isOffline, setIsOffline] = useState<boolean>(!offlineSyncManager.isOnline);
 
   // Initialize cached location on mount
   useEffect(() => {
@@ -176,9 +179,14 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (!error && data) {
         const mapped = data.map(mapDbListing);
         setListings(mapped);
+        offlineSyncManager.cacheListings(mapped);
       }
     } catch (err) {
-      console.log('Supabase listings fetch error, using local data:', err);
+      console.log('Supabase listings fetch error, using local/cached data:', err);
+      const cached = await offlineSyncManager.getCachedListings();
+      if (cached && cached.length > 0) {
+        setListings(cached);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -189,14 +197,40 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const { data } = await supabase.from('categories').select('*');
       if (data && data.length > 0) {
         setCategories(data);
+        offlineSyncManager.cacheCategories(data);
       }
     } catch {
-      // offline fallback
+      const cachedCats = await offlineSyncManager.getCachedCategories();
+      if (cachedCats && cachedCats.length > 0) {
+        setCategories(cachedCats);
+      }
     }
   };
 
-  // Fetch initial data from Supabase
+  // Fetch initial data from Supabase & Hydrate from Cache
   useEffect(() => {
+    // 1. Immediately hydrate from cache so user sees produce instantly even offline
+    offlineSyncManager.getCachedListings().then((cached) => {
+      if (cached && cached.length > 0) {
+        setListings(cached);
+      }
+    });
+
+    offlineSyncManager.getCachedCategories().then((cachedCats) => {
+      if (cachedCats && cachedCats.length > 0) {
+        setCategories(cachedCats);
+      }
+    });
+
+    // 2. Subscribe to network status
+    const unsubNet = offlineSyncManager.subscribeToNetwork((online) => {
+      setIsOffline(!online);
+      if (online) {
+        fetchLiveListings();
+        fetchLiveCategories();
+      }
+    });
+
     fetchLiveListings();
     fetchLiveCategories();
 
@@ -209,18 +243,31 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         (payload) => {
           if (payload.eventType === 'INSERT') {
             const newItem = mapDbListing(payload.new);
-            setListings((prev) => [newItem, ...prev.filter((i) => i.id !== newItem.id)]);
+            setListings((prev) => {
+              const updated = [newItem, ...prev.filter((i) => i.id !== newItem.id)];
+              offlineSyncManager.cacheListings(updated);
+              return updated;
+            });
           } else if (payload.eventType === 'UPDATE') {
-            const updated = mapDbListing(payload.new);
-            setListings((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+            const updatedItem = mapDbListing(payload.new);
+            setListings((prev) => {
+              const updatedList = prev.map((item) => (item.id === updatedItem.id ? updatedItem : item));
+              offlineSyncManager.cacheListings(updatedList);
+              return updatedList;
+            });
           } else if (payload.eventType === 'DELETE') {
-            setListings((prev) => prev.filter((item) => item.id !== (payload.old as any).id));
+            setListings((prev) => {
+              const updatedList = prev.filter((item) => item.id !== (payload.old as any).id);
+              offlineSyncManager.cacheListings(updatedList);
+              return updatedList;
+            });
           }
         }
       )
       .subscribe();
 
     return () => {
+      unsubNet();
       supabase.removeChannel(channel);
     };
   }, []);
@@ -447,6 +494,7 @@ export const ListingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isDetectingLocation,
         detectAndSetLocation,
         selectDistrictCoords,
+        isOffline,
       }}
     >
       {children}

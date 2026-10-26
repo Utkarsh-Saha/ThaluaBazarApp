@@ -8,12 +8,14 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { Search, Sparkles, MapPin, SlidersHorizontal, X } from 'lucide-react-native';
+import { Search, Sparkles, MapPin, SlidersHorizontal, X, Mic } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { RadiusSlider } from '../../components/RadiusSlider';
 import { CategoryPills } from '../../components/CategoryPills';
 import { ProductCard } from '../../components/ProductCard';
 import { FilterModal } from '../../components/FilterModal';
+import { OfflineBanner } from '../../components/OfflineBanner';
+import { AssameseVoiceSearchModal } from '../../components/AssameseVoiceSearchModal';
 import { COLORS } from '../../constants/theme';
 import { useLanguage } from '../../context/LanguageContext';
 import { useListings } from '../../context/ListingsContext';
@@ -39,10 +41,12 @@ export default function ExploreScreen() {
   } = useListings();
 
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
 
   return (
     <View style={styles.container}>
       <Header />
+      <OfflineBanner />
 
       <FlatList
         data={filteredListings}
@@ -67,17 +71,38 @@ export default function ExploreScreen() {
               </View>
             </View>
 
-            {/* Search Input Bar with Filter Button */}
+            {/* Search Input Bar with Voice Search & Filter Button */}
             <View style={styles.searchRow}>
               <View style={styles.searchContainer}>
                 <Search size={18} color={COLORS.textSecondary} />
                 <TextInput
                   style={styles.searchInput}
-                  placeholder={t('search')}
+                  placeholder={language === 'as' ? 'সামগ্ৰী বিচাৰক বা কথা কওক...' : 'Search produce or tap mic...'}
                   placeholderTextColor={COLORS.textMuted}
                   value={searchQuery}
                   onChangeText={setSearchQuery}
                 />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.clearSearchBtn}
+                    onPress={() => {
+                      triggerHaptic('light');
+                      setSearchQuery('');
+                    }}
+                  >
+                    <X size={15} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.voiceMicBtn}
+                  onPress={() => {
+                    triggerHaptic('medium');
+                    setShowVoiceModal(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Mic size={17} color={COLORS.primary} />
+                </TouchableOpacity>
               </View>
 
               <TouchableOpacity
@@ -240,6 +265,14 @@ export default function ExploreScreen() {
         visible={showFilterModal}
         onClose={() => setShowFilterModal(false)}
       />
+
+      <AssameseVoiceSearchModal
+        visible={showVoiceModal}
+        onClose={() => setShowVoiceModal(false)}
+        onSelectQuery={(query) => {
+          setSearchQuery(query);
+        }}
+      />
     </View>
   );
 }
@@ -286,6 +319,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: '100%',
+    color: COLORS.text,
+    fontSize: 14,
+    paddingVertical: 0,
+  },
+  clearSearchBtn: {
+    padding: 4,
+  },
+  voiceMicBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterBtn: {
     width: 46,
@@ -344,11 +395,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: COLORS.textMuted,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: COLORS.text,
   },
   sectionHeader: {
     flexDirection: 'row',

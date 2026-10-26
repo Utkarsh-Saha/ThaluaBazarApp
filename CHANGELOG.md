@@ -9,6 +9,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased] - 2026-10-26
 
+### Feat: Assamese Voice Search & Offline-First Sync Queue (P2)
+
+#### Added
+- **Assamese Voice Search (`src/components/AssameseVoiceSearchModal.tsx`)**:
+  - **Speech Audio Recording (`expo-audio`)**: Native microphone permissions and real-time audio waveform animation with bounce meters.
+  - **Phonetic Assamese Commodity Engine**: Built-in dictionary mapping rural Assamese terminology (*জহা চাউল, কাজি নেমু, ভোট জলকীয়া, সৰিয়হৰ তেল, বাঁহৰ গাজ/খৰিচা, মুগা আৰু এৰি কাপোৰ, খলিহনা মাছ, পিঠা আৰু লাড়ু, গাঁৱৰ কণী, খাঁটি ঘিউ*) to standardized search queries.
+  - **Conversational Speech Prompts**: Quick touch-and-speak chips for natural Assamese phrases (*"মোক সতেজ জহা চাউল লাগে"*, *"কাজি নেমু ক'ত পাম"*, etc.).
+  - **Search Bar Integration**: Microphone button in `src/app/(tabs)/explore.tsx` search bar with clear button and query synchronization.
+  - **Backend Transcription Endpoint**: Added `backend/src/routes/voiceRoutes.ts` (`POST /api/v1/voice/transcribe`) for server-side phonetic intent parsing.
+- **Offline-First Resilience & Sync Queue (`src/lib/offlineSync.ts`, `src/components/OfflineBanner.tsx`)**:
+  - **Instant Offline Catalog Caching**: Cached listings and categories in `AsyncStorage` (`@thaluwa_cached_listings`), hydrating state on app startup before network requests for zero-latency loading.
+  - **Persistent Mutation Sync Queue**: Queues offline actions (`CREATE_ORDER`, `SAVE_ADDRESS`, `TOGGLE_WISHLIST`) in local storage and flushes them sequentially to Supabase when network connectivity returns.
+  - **Network Heartbeat Monitor**: Automatically checks internet connectivity with fast pings and notifies state subscribers.
+  - **Floating Offline Banner (`OfflineBanner.tsx`)**: Displays clean floating status indicator when offline or when actions are pending, complete with manual retry/sync action button.
+
 ### Feat: Razorpay Payment Gateway & Instant UPI Checkout (P0)
 
 #### Added
