@@ -161,6 +161,44 @@ export const CONVERSATIONAL_PHRASES = [
   },
 ];
 
+// Natural Assamese speech intent matching engine
+export function matchProduceFromSpeech(transcript: string): AssameseCommodity | null {
+  if (!transcript || transcript.trim().length === 0) return null;
+  const clean = transcript.toLowerCase().trim();
+
+  // 1. Check keywords of known Assam commodities
+  for (const item of POPULAR_ASSAM_COMMODITIES) {
+    for (const kw of item.keywords) {
+      if (clean.includes(kw.toLowerCase())) {
+        return item;
+      }
+    }
+  }
+
+  // 2. Check Assamese and English names
+  for (const item of POPULAR_ASSAM_COMMODITIES) {
+    if (
+      clean.includes(item.nameAs.toLowerCase()) ||
+      clean.includes(item.nameEn.toLowerCase())
+    ) {
+      return item;
+    }
+  }
+
+  // 3. Fallback: If user spoke something custom (e.g. "বিলাহী" / "Tomato", "আলু" / "Potato")
+  if (clean.length >= 2) {
+    return {
+      id: `custom_${Date.now()}`,
+      nameAs: transcript.trim(),
+      nameEn: transcript.trim(),
+      category: 'Fresh Produce',
+      keywords: [clean],
+    };
+  }
+
+  return null;
+}
+
 export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> = ({
   visible,
   onClose,
@@ -170,10 +208,13 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [recognizedItem, setRecognizedItem] = useState<AssameseCommodity | null>(null);
+  const [liveSpokenText, setLiveSpokenText] = useState<string>('');
+  const [noMatchWarning, setNoMatchWarning] = useState<boolean>(false);
   const [prevVisible, setPrevVisible] = useState(visible);
 
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recordIntervalRef = useRef<any>(null);
+  const speechRecRef = useRef<any>(null);
 
   // Animation values for audio wave pulsation
   const [pulseAnim] = useState(() => new Animated.Value(1));
@@ -186,6 +227,8 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
     setPrevVisible(visible);
     if (visible) {
       setRecognizedItem(null);
+      setLiveSpokenText('');
+      setNoMatchWarning(false);
       setRecordingSeconds(0);
       setIsRecording(false);
     }
@@ -239,6 +282,48 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
 
   const startVoiceRecording = async () => {
     triggerHaptic('medium');
+    setNoMatchWarning(false);
+    setLiveSpokenText('');
+    setRecognizedItem(null);
+
+    // Initialize Web Speech API if in web/browser environment
+    if (
+      typeof window !== 'undefined' &&
+      (('SpeechRecognition' in window) || ('webkitSpeechRecognition' in window))
+    ) {
+      try {
+        const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const rec = new SpeechRec();
+        rec.lang = 'as-IN';
+        rec.interimResults = true;
+        rec.continuous = false;
+        rec.maxAlternatives = 3;
+
+        rec.onresult = (e: any) => {
+          let text = '';
+          for (let i = 0; i < e.results.length; i++) {
+            text += e.results[i][0].transcript;
+          }
+          if (text) {
+            setLiveSpokenText(text);
+            const match = matchProduceFromSpeech(text);
+            if (match) {
+              setRecognizedItem(match);
+            }
+          }
+        };
+
+        rec.onerror = (e: any) => {
+          console.warn('[AssameseVoiceSearch] Speech Recognition error:', e?.error);
+        };
+
+        rec.start();
+        speechRecRef.current = rec;
+      } catch (err) {
+        console.warn('[AssameseVoiceSearch] SpeechRec start failed:', err);
+      }
+    }
+
     try {
       if (Platform.OS !== 'web') {
         await setAudioModeAsync({
@@ -256,7 +341,6 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
 
       setIsRecording(true);
       setRecordingSeconds(0);
-      setRecognizedItem(null);
 
       recordIntervalRef.current = setInterval(() => {
         setRecordingSeconds((prev) => {
@@ -281,6 +365,13 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
       recordIntervalRef.current = null;
     }
 
+    if (speechRecRef.current) {
+      try {
+        speechRecRef.current.stop();
+      } catch {}
+      speechRecRef.current = null;
+    }
+
     try {
       if (Platform.OS !== 'web') {
         await audioRecorder.stop();
@@ -289,12 +380,19 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
 
     setIsRecording(false);
 
-    // Natural Assamese speech intent matching:
-    // Select one of the most prominent rural Assam produce items based on duration/timestamp
-    const sampleIndex = Math.floor(Date.now() / 1000) % POPULAR_ASSAM_COMMODITIES.length;
-    const matched = POPULAR_ASSAM_COMMODITIES[sampleIndex];
-
-    setRecognizedItem(matched);
+    // Accurately evaluate transcribed speech
+    if (liveSpokenText && liveSpokenText.trim().length > 0) {
+      const matched = matchProduceFromSpeech(liveSpokenText);
+      if (matched) {
+        setRecognizedItem(matched);
+        setNoMatchWarning(false);
+      } else {
+        setNoMatchWarning(true);
+      }
+    } else if (!recognizedItem) {
+      // Speech could not be captured clearly
+      setNoMatchWarning(true);
+    }
   };
 
   const handleApplyQuery = (query: string) => {
@@ -424,6 +522,30 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
               )}
             </View>
 
+            {/* Live Heard Speech Pill */}
+            {isRecording && !!liveSpokenText && (
+              <View style={styles.liveSpeechBox}>
+                <Text style={styles.liveSpeechLabel}>
+                  {language === 'as' ? 'শুনি থকা হৈছে:' : 'Hearing:'}
+                </Text>
+                <Text style={styles.liveSpeechText}>{`"${liveSpokenText}"`}</Text>
+              </View>
+            )}
+
+            {/* Warning when speech could not be recognized */}
+            {noMatchWarning && !isRecording && (
+              <View style={styles.warningCard}>
+                <Text style={styles.warningTitle}>
+                  {language === 'as' ? 'কণ্ঠ চিনাক্ত হোৱা নাই' : 'Could not catch voice clearly'}
+                </Text>
+                <Text style={styles.warningSubtitle}>
+                  {language === 'as'
+                    ? 'অনুগ্ৰহ কৰি মাইক্ৰ’ফোনৰ ওচৰৰ পৰা কওক (যেনে: “জহা চাউল”, “কাজি নেমু”) বা তলৰ সামগ্ৰীত টিপক।'
+                    : 'Please speak closer to the mic (e.g. "Joha Rice", "Kaji Nemu") or tap a produce chip below.'}
+                </Text>
+              </View>
+            )}
+
             {/* Recognition Result Banner */}
             {recognizedItem && !isRecording && (
               <View style={styles.resultCard}>
@@ -434,7 +556,7 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
                       {language === 'as' ? 'চিনাক্ত উৎপাদিত সামগ্ৰী:' : 'Recognized Produce:'}
                     </Text>
                     <Text style={styles.resultTitle}>
-                      {recognizedItem.nameAs} ({recognizedItem.nameEn})
+                      {recognizedItem.nameAs} {recognizedItem.nameAs !== recognizedItem.nameEn ? `(${recognizedItem.nameEn})` : ''}
                     </Text>
                     <Text style={styles.resultCategory}>{recognizedItem.category}</Text>
                   </View>
@@ -442,7 +564,7 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
 
                 <TouchableOpacity
                   style={styles.searchNowBtn}
-                  onPress={() => handleApplyQuery(recognizedItem.nameEn)}
+                  onPress={() => handleApplyQuery(recognizedItem.nameEn || recognizedItem.nameAs)}
                   activeOpacity={0.88}
                 >
                   <Search size={14} color="#FFFFFF" />
@@ -624,6 +746,51 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingHorizontal: 20,
     lineHeight: 18,
+  },
+  liveSpeechBox: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: 'center',
+    marginTop: -8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  liveSpeechLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+  },
+  liveSpeechText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  warningCard: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  warningTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  warningSubtitle: {
+    fontSize: 11,
+    color: '#92400E',
+    textAlign: 'center',
+    marginTop: 3,
+    lineHeight: 16,
   },
   resultCard: {
     flexDirection: 'row',
