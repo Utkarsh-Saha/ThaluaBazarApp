@@ -8,6 +8,7 @@ import {
   ScrollView,
   Animated,
   Platform,
+  TextInput,
 } from 'react-native';
 import {
   X,
@@ -209,7 +210,8 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [recognizedItem, setRecognizedItem] = useState<AssameseCommodity | null>(null);
   const [liveSpokenText, setLiveSpokenText] = useState<string>('');
-  const [noMatchWarning, setNoMatchWarning] = useState<boolean>(false);
+  const [audioCaptured, setAudioCaptured] = useState<boolean>(false);
+  const [manualSearchText, setManualSearchText] = useState<string>('');
   const [prevVisible, setPrevVisible] = useState(visible);
 
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -228,7 +230,8 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
     if (visible) {
       setRecognizedItem(null);
       setLiveSpokenText('');
-      setNoMatchWarning(false);
+      setManualSearchText('');
+      setAudioCaptured(false);
       setRecordingSeconds(0);
       setIsRecording(false);
     }
@@ -282,7 +285,7 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
 
   const startVoiceRecording = async () => {
     triggerHaptic('medium');
-    setNoMatchWarning(false);
+    setAudioCaptured(false);
     setLiveSpokenText('');
     setRecognizedItem(null);
 
@@ -294,7 +297,8 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
       try {
         const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         const rec = new SpeechRec();
-        rec.lang = 'as-IN';
+        // Use bn-IN which supports Eastern Nagari Assamese script phonetics in Chromium
+        rec.lang = 'bn-IN';
         rec.interimResults = true;
         rec.continuous = false;
         rec.maxAlternatives = 3;
@@ -306,15 +310,23 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
           }
           if (text) {
             setLiveSpokenText(text);
+            setManualSearchText(text);
             const match = matchProduceFromSpeech(text);
             if (match) {
               setRecognizedItem(match);
+              setAudioCaptured(false);
             }
           }
         };
 
         rec.onerror = (e: any) => {
           console.warn('[AssameseVoiceSearch] Speech Recognition error:', e?.error);
+          if (e?.error === 'language-not-supported') {
+            try {
+              rec.lang = 'en-IN';
+              rec.start();
+            } catch {}
+          }
         };
 
         rec.start();
@@ -385,13 +397,20 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
       const matched = matchProduceFromSpeech(liveSpokenText);
       if (matched) {
         setRecognizedItem(matched);
-        setNoMatchWarning(false);
+        setAudioCaptured(false);
       } else {
-        setNoMatchWarning(true);
+        setRecognizedItem({
+          id: `custom_${Date.now()}`,
+          nameAs: liveSpokenText.trim(),
+          nameEn: liveSpokenText.trim(),
+          category: 'Produce',
+          keywords: [liveSpokenText.toLowerCase().trim()],
+        });
+        setAudioCaptured(false);
       }
-    } else if (!recognizedItem) {
-      // Speech could not be captured clearly
-      setNoMatchWarning(true);
+    } else {
+      // On mobile native in Expo Go, mark audio as captured and prompt produce confirmation
+      setAudioCaptured(true);
     }
   };
 
@@ -532,19 +551,52 @@ export const AssameseVoiceSearchModal: React.FC<AssameseVoiceSearchModalProps> =
               </View>
             )}
 
-            {/* Warning when speech could not be recognized */}
-            {noMatchWarning && !isRecording && (
-              <View style={styles.warningCard}>
-                <Text style={styles.warningTitle}>
-                  {language === 'as' ? 'কণ্ঠ চিনাক্ত হোৱা নাই' : 'Could not catch voice clearly'}
-                </Text>
-                <Text style={styles.warningSubtitle}>
+            {/* Audio Captured Success Card (for Mobile Native Expo Go) */}
+            {audioCaptured && !isRecording && !recognizedItem && (
+              <View style={styles.audioCapturedCard}>
+                <View style={styles.audioCapturedHeader}>
+                  <Volume2 size={18} color={COLORS.primary} />
+                  <Text style={styles.audioCapturedTitle}>
+                    {language === 'as' ? '🎙️ কণ্ঠ বাৰ্তা সংৰক্ষিত হ’ল!' : '🎙️ Voice Audio Captured!'}
+                  </Text>
+                </View>
+                <Text style={styles.audioCapturedSubtitle}>
                   {language === 'as'
-                    ? 'অনুগ্ৰহ কৰি মাইক্ৰ’ফোনৰ ওচৰৰ পৰা কওক (যেনে: “জহা চাউল”, “কাজি নেমু”) বা তলৰ সামগ্ৰীত টিপক।'
-                    : 'Please speak closer to the mic (e.g. "Joha Rice", "Kaji Nemu") or tap a produce chip below.'}
+                    ? 'তলৰ পৰা আপোনাৰ বিচৰা সামগ্ৰী বাছক বা অনুসন্ধান বাকচত টাইপ কৰক:'
+                    : 'Tap your desired produce below to search instantly, or type above:'}
                 </Text>
               </View>
             )}
+
+            {/* Quick Direct Search Input Bar */}
+            <View style={styles.searchBarRow}>
+              <Search size={16} color={COLORS.textSecondary} />
+              <TextInput
+                style={styles.searchBarInput}
+                placeholder={
+                  language === 'as'
+                    ? 'বা সামগ্ৰীৰ নাম লিখক (যেনে: জহা চাউল)...'
+                    : 'Or type produce (e.g. Joha Rice)...'
+                }
+                placeholderTextColor={COLORS.textMuted}
+                value={manualSearchText}
+                onChangeText={setManualSearchText}
+                onSubmitEditing={() => {
+                  if (manualSearchText.trim()) handleApplyQuery(manualSearchText.trim());
+                }}
+              />
+              {manualSearchText.trim().length > 0 && (
+                <TouchableOpacity
+                  style={styles.searchBarSubmitBtn}
+                  onPress={() => handleApplyQuery(manualSearchText.trim())}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.searchBarSubmitText}>
+                    {language === 'as' ? 'বিচাৰক' : 'Go'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             {/* Recognition Result Banner */}
             {recognizedItem && !isRecording && (
@@ -770,6 +822,61 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: COLORS.primary,
+  },
+  audioCapturedCard: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1.5,
+    borderColor: '#86EFAC',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+    ...SHADOWS.sm,
+  },
+  audioCapturedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  audioCapturedTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#15803D',
+  },
+  audioCapturedSubtitle: {
+    fontSize: 12,
+    color: '#166534',
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  searchBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
+    gap: 8,
+  },
+  searchBarInput: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.text,
+    paddingVertical: 2,
+  },
+  searchBarSubmitBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  searchBarSubmitText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   warningCard: {
     backgroundColor: '#FFFBEB',
