@@ -6,6 +6,8 @@ import {
   updateOrderStatus,
 } from '../controllers/ordersController.js';
 import { optionalAuth } from '../middleware/authMiddleware.js';
+import { validateBody } from '../middleware/validate.js';
+import { createOrderSchema } from '../validators/schemas.js';
 
 const router = Router();
 
@@ -19,7 +21,7 @@ router.get('/seller/:sellerId', (req, res) => {
   return getOrders(req, res);
 });
 router.get('/:id', getOrderById);
-router.post('/', optionalAuth, createOrder);
+router.post('/', optionalAuth, validateBody(createOrderSchema), createOrder);
 router.patch('/:id/status', optionalAuth, updateOrderStatus);
 
 export default router;

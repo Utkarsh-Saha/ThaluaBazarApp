@@ -4,6 +4,7 @@ import { User, SellerProfile, UserRole, SellerType } from '../types';
 import { supabase } from '../lib/supabase';
 import { apiRequest, TOKEN_STORAGE_KEY } from '../lib/api';
 import { registerForPushNotificationsAsync } from '../lib/notifications';
+import { saveSecureItem, getSecureItem, deleteSecureItem } from '../lib/secureStorage';
 
 export interface BuyerRegistrationData {
   phone: string;
@@ -76,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const [storedUser, storedSeller, storedToken] = await Promise.all([
         AsyncStorage.getItem(USER_STORAGE_KEY),
         AsyncStorage.getItem(SELLER_STORAGE_KEY),
-        AsyncStorage.getItem(TOKEN_STORAGE_KEY),
+        getSecureItem(TOKEN_STORAGE_KEY),
       ]);
 
       if (storedUser) {
@@ -90,7 +91,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           parsed.phone === '+91 98765 43210' ||
           parsed.phone === '9876543210'
         ) {
-          await AsyncStorage.multiRemove([USER_STORAGE_KEY, SELLER_STORAGE_KEY, TOKEN_STORAGE_KEY]);
+          await AsyncStorage.multiRemove([USER_STORAGE_KEY, SELLER_STORAGE_KEY]);
+          await deleteSecureItem(TOKEN_STORAGE_KEY);
           setUser(null);
           setSellerProfile(null);
           setToken(null);
@@ -179,7 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (sessionToken) {
           setToken(sessionToken);
-          await AsyncStorage.setItem(TOKEN_STORAGE_KEY, sessionToken);
+          await saveSecureItem(TOKEN_STORAGE_KEY, sessionToken);
         }
 
         if (isNewUser) {
@@ -239,7 +241,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setRole('buyer');
         if (res.data.token) {
           setToken(res.data.token);
-          await AsyncStorage.setItem(TOKEN_STORAGE_KEY, res.data.token);
+          await saveSecureItem(TOKEN_STORAGE_KEY, res.data.token);
         }
         await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser));
         setIsLoading(false);
@@ -447,13 +449,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
+      await apiRequest('/auth/logout', { method: 'POST' }).catch(() => {});
+    } catch {
+      // Ignore network errors during logout
+    }
+    try {
       await supabase.auth.signOut();
-    } catch (e) {
-      // ignore
+    } catch {
+      // Ignore Supabase signout errors
     }
     await AsyncStorage.removeItem(USER_STORAGE_KEY);
     await AsyncStorage.removeItem(SELLER_STORAGE_KEY);
-    await AsyncStorage.removeItem(TOKEN_STORAGE_KEY);
+    await deleteSecureItem(TOKEN_STORAGE_KEY);
     setUser(null);
     setSellerProfile(null);
     setToken(null);

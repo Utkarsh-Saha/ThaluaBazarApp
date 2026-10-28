@@ -44,7 +44,9 @@ const tablesInOrder = [
   'orders',
   'listings',
   'seller_profiles',
+  'sellers',
   'categories',
+  'profiles',
   'users',
   'haat_markets',
 ];
@@ -123,7 +125,23 @@ async function wipeDatabase() {
     console.warn(`⚠️  Auth wipe exception: ${authEx.message}`);
   }
 
-  // 3. Final Verification
+  // 3. Purge mock images from Storage bucket
+  console.log('\n⏳ Checking Supabase Storage files (product-images)...');
+  try {
+    const { data: files } = await supabase.storage.from('product-images').list('products');
+    if (files && files.length > 0) {
+      const paths = files.map(f => `products/${f.name}`);
+      console.log(`Found ${paths.length} files in product-images/products. Deleting...`);
+      await supabase.storage.from('product-images').remove(paths);
+      console.log('✅ Supabase storage mock images purged.');
+    } else {
+      console.log('✅ product-images storage bucket is already clean.');
+    }
+  } catch (stEx) {
+    console.warn(`⚠️  Storage wipe exception: ${stEx.message}`);
+  }
+
+  // 4. Final Verification
   console.log('\n========================================================');
   console.log('📊 FINAL TABLE ROW COUNT VERIFICATION');
   console.log('========================================================');

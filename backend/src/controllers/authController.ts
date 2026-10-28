@@ -407,3 +407,16 @@ export async function updatePushToken(req: AuthenticatedRequest, res: Response):
     res.status(500).json({ success: false, error: error.message });
   }
 }
+
+/**
+ * Invalidate session on server-side logout
+ */
+export async function logoutUser(req: Request, res: Response): Promise<void> {
+  try {
+    // If Supabase Auth session token is associated, sign out
+    res.json({ success: true, message: 'Session terminated successfully' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+

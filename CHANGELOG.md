@@ -7,7 +7,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ---
 
 
-## [Unreleased] - 2026-10-26
+
+## [Unreleased] - 2026-10-27
+
+### Security: Full-Stack Security Audit, Hardened RLS & Cryptographic Strategy
+
+#### Added
+- **Row Level Security (RLS) Policy Overhaul (`supabase/schema.sql`, `backend/src/database/schema.sql`)**:
+  - **100% RLS Enforcement**: Enabled `ROW LEVEL SECURITY` across all 15 public schema tables (`users`, `seller_profiles`, `categories`, `listings`, `orders`, `order_items`, `reviews`, `notifications`, `seller_payouts`, `contact_unlocks`, `user_addresses`, `conversations`, `messages`, `payment_transactions`, `audit_logs`).
+  - **Eliminated Permissive Policies**: Completely replaced open `using (true)` / `with check (true)` policies with granular, least-privilege policies for `SELECT`, `INSERT`, `UPDATE`, and `DELETE`.
+  - **Security Definer Helpers**: Built `public.current_user_id()`, `public.is_admin()`, and `public.is_seller()` security definer functions to safely map `auth.uid()` to user profiles and verify administrative permissions.
+  - **Immutable Ledgers**: Hardened `payment_transactions` and `audit_logs` against client-side tampering by denying all direct `UPDATE` and `DELETE` queries.
+- **Strict Storage Bucket & Realtime Security**:
+  - **Private Seller KYC Documents (`seller-documents`)**: Changed bucket from public to private (`public = false`). Restricted access to the verified document owner (`(storage.foldername(name))[1] = auth.uid()`) and administrators.
+  - **Private Audio Recordings (`chat-audio`)**: Changed voice notes bucket to private (`public = false`), granting read access strictly to authenticated conversation participants.
+  - **Realtime Channel Protection**: Enforced `replica identity full` on `orders`, `messages`, `conversations`, and `notifications`, binding WebSocket events to authenticated RLS row filters.
+- **Cryptographic Encryption & PII Masking Strategy (`backend/src/utils/crypto.ts`)**:
+  - **Authenticated AES-256-GCM Encryption**: Built Node.js authenticated encryption for sensitive producer bank details and KYC identifiers with 96-bit IVs and 128-bit authentication tags.
+  - **Constant-Time HMAC-SHA256 Verification**: Integrated `crypto.timingSafeEqual` for cryptographic webhook and payment signature verification.
+  - **PII Masking**: Added `maskSensitiveIdentifier` and PostgreSQL `public.mask_sensitive_number` to protect bank account numbers across public responses.
+  - **`pgcrypto` Extension**: Enabled PostgreSQL `pgcrypto` in database schema for server-side column encryption and cryptographic hashing.
+- **Hardware-Backed Client Token Storage (`src/lib/secureStorage.ts`, `expo-secure-store`)**:
+  - Installed and configured `expo-secure-store` (~SDK 58) for native iOS Keychain and Android Keystore (AES-256) hardware-level encryption.
+  - Built `ExpoSecureStoreAdapter` compliant with `@supabase/supabase-js` storage interface with automatic web fallback to `AsyncStorage`.
+  - Migrated `@thaluwa_auth_token` persistence in `src/lib/api.ts` and `src/context/AuthContext.tsx` from unencrypted storage to `SecureStore`.
+- **Environment & Key Hygiene Verification**:
+  - Verified that `SUPABASE_SERVICE_ROLE_KEY` is strictly isolated to backend services and maintenance CLI scripts, with zero exposure in client mobile bundles.
+  - Audited table grants: revoked blanket default permissions (`anon`, `authenticated`) and granted explicit minimum required access.
+- **API Rate Limiting & Input Validation (`backend/src/middleware/rateLimit.ts`, `backend/src/validators/schemas.ts`)**:
+  - **OTP Rate Limiting**: Added `otpSendLimiter` (max 5 requests/10 min) and `otpVerifyLimiter` (max 5 attempts/10 min) to stop SMS spam and credential brute-forcing.
+  - **Deep Payload Sanitization**: Integrated `sanitizePayload` middleware stripping null bytes, `<script>` tags, and blocking prototype pollution attacks.
+  - **Zod Schema Validation**: Wired strict schemas to `/auth/send-otp`, `/auth/verify-otp`, `/auth/register-buyer`, `/seller/register`, and `/orders`.
+- **Network Security & Mobile Hardening (`src/lib/networkSecurity.ts`, `app.json`, `src/lib/storage.ts`)**:
+  - **Transport Security**: Added `enforceHttps` to ensure TLS communication in production and configured iOS App Transport Security (`NSAllowsArbitraryLoads: false`) in `app.json`.
+  - **Session Timeout & Invalidation**: Integrated JWT expiration checks (`isJwtExpired`) and automatic 401 cache-wipe in `src/lib/api.ts`, with server-side `/auth/logout` endpoint.
+  - **Granular Storage Upload Validation**: Added 5MB file-size limits, extension whitelisting (`jpg`, `jpeg`, `png`, `webp`, `pdf`), and 24-hour signed URLs for private KYC documents in `src/lib/storage.ts`.
+- **Dependency Vulnerability Remediation**:
+  - Ran dependency vulnerability audit across root, `backend/`, and `admin-panel/`.
+  - Patched high-severity advisories in `body-parser`, `node-forge`, and updated `vite` in `admin-panel/` to resolve 100% of vulnerabilities (0 vulnerabilities reported).
+
 
 ### Feat: Native Google Keyboard Voice Typing & Offline-First Sync Queue (P2)
 

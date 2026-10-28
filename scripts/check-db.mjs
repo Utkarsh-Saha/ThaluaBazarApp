@@ -46,6 +46,11 @@ const tables = [
   'notifications',
   'seller_payouts',
   'contact_unlocks',
+  'user_addresses',
+  'conversations',
+  'messages',
+  'payment_transactions',
+  'audit_logs',
 ];
 
 async function checkDatabase() {
